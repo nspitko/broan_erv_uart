@@ -2,7 +2,13 @@
 
 #include "esphome.h"
 #include "esphome/core/component.h"
+
+#ifdef USE_SELECT
+#include "esphome/components/select/select.h"
+#endif
+
 #include "esphome/components/uart/uart.h"
+
 
 namespace esphome {
 namespace broan {
@@ -31,7 +37,7 @@ enum BroanFanMode
 
 enum BroanField
 {
-	FanMode = 18, // 0x0A for max, 0x09 for min, 0x0B for variable, and 0x01 for off
+	FanMode = 19, // 0x0A for max, 0x09 for min, 0x0B for variable, and 0x01 for off
 	Uptime = 20, // In seconds?
 	FanSpeed = 23, // Fan speed
 	FanSpeedB = 7, // Also Fan speed?
@@ -51,6 +57,8 @@ struct BroanField_t
 		uint8_t m_chValue;
 	} m_value;
 
+	bool m_bStale = true;
+
 	// Totally safe blind copy of the incoming value.
 	BroanField_t copyForUpdate(BroanFieldTypes auto const &newVal) const
 	{
@@ -67,8 +75,9 @@ struct BroanField_t
 class BroanComponent : public Component, public uart::UARTDevice
 {
 
-  SUB_SELECT(fan_mode)
-
+#ifdef USE_SELECT
+	SUB_SELECT(fan_mode)
+#endif
 public:
 	uint8_t m_nServerAddress = 0x10;
 	uint8_t m_nClientAddress = 0x11;
@@ -137,8 +146,6 @@ private:
   		return (flIn - flInMin) * (flOutMax - flOutMin) / (flInMax - flInMin) + flOutMin;
 	}
 
-public:
-	void set_fan_mode( std::string mode ) {}
 
 protected:
 	std::string fan_mode_{};

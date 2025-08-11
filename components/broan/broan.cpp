@@ -67,8 +67,8 @@ bool BroanComponent::readHeader()
 
 void BroanComponent::writeRegisters( const std::vector<BroanField_t> &values )
 {
-	return;
-	std::vector<uint8_t> message(4);
+	std::vector<uint8_t> message;
+
 
 	message.push_back(0x40); // Write
 
@@ -204,20 +204,32 @@ void BroanComponent::runRequests()
 	// Request new data
 	if( m_nNextQuery > 0 && time > m_nNextQuery )
 	{
-		m_nNextQuery = time + 5000;
+		m_nNextQuery = time + 500;
+
+		m_vecFields[FanMode].m_bStale = true;
+		m_vecFields[FanSpeed].m_bStale = true;
+		m_vecFields[FanSpeedB].m_bStale = true;
+
 		std::vector<unsigned char> request;
 		request.push_back(0x20);
 		int count = 0;
-		while( count++ < 10 )
+		// Only check 10 fields at a time. Not sure if this is actually useful?
+		// We don't know the message length limit yet.
+		for( int i=0; i<BROAN_NUM_FIELDS; i++ )
 		{
-			m_nQueryCursor++;
-			if( m_nQueryCursor >= BROAN_NUM_FIELDS)
-				m_nQueryCursor = 0;
+			if( !m_vecFields[i].m_bStale )
+				continue;
 
-			request.push_back( m_vecFields[m_nQueryCursor].m_nOpcodeHigh );
-			request.push_back( m_vecFields[m_nQueryCursor].m_nOpcodeLow );
+			count++;
+
+			m_vecFields[i].m_bStale = false;
+
+			request.push_back( m_vecFields[i].m_nOpcodeHigh );
+			request.push_back( m_vecFields[i].m_nOpcodeLow );
 		}
-		send(request);
+
+		if( request.size() > 0 )
+			send(request);
 		//ESP_LOGD("broan", "Sending 0x20 request..." );
 
 	}
