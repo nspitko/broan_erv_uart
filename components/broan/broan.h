@@ -78,6 +78,11 @@ class BroanComponent : public Component, public uart::UARTDevice
 #ifdef USE_SELECT
 	SUB_SELECT(fan_mode)
 #endif
+
+#ifdef USE_NUMBER
+	SUB_NUMBER(fan_speed)
+#endif
+
 public:
 	uint8_t m_nServerAddress = 0x10;
 	uint8_t m_nClientAddress = 0x11;
@@ -149,6 +154,7 @@ private:
 
 protected:
 	std::string fan_mode_{};
+	float fan_speed_{0.f};
 
 };
 

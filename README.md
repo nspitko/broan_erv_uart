@@ -30,7 +30,7 @@ external_components:
 
 ota:
   - platform: esphome
-    password: "changeme!!!!!!!!!!!!!!!!" 
+    password: "changeme!!!!!!!!!!!!!!!!"
 
 wifi:
   ssid: !secret wifi_ssid
@@ -39,7 +39,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Esp-Erv Fallback Hotspot"
-    password: "changeme!!!" 
+    password: "changeme!!!"
 
 captive_portal:
 
@@ -62,6 +62,10 @@ select:
   - platform: broan
     fan_mode:
       name: "fan mode"
-    
-    
+
+number:
+  - platform: broan
+    fan_speed:
+      name: "fan speed"
+
 ```

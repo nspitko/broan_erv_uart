@@ -280,7 +280,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 					case BroanField::FanSpeed:
 					{
 						float flAdjusted = remap( field.m_value.m_flValue, 32.f, 175.f, 0.f, 100.f );
-						//fan_mode_speed_->publish_state(flAdjusted);
+						fan_speed_number_->publish_state(flAdjusted);
 					}
 					break;
 				}
