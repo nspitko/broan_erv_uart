@@ -16,13 +16,16 @@ void BroanComponent::setup()
 
 void BroanComponent::loop()
 {
+	bool bCanSend = false;
 	while ( true )
 	{
 		if( !readHeader() ) break;
-		if( !readMessage() ) break;
+		bool bRead = readMessage();
+		bCanSend |= bRead;
+		if( !bRead ) break;
 	}
 
-	if( !readHeader() )
+	if( bCanSend )
 		runRequests();
 }
 
@@ -154,9 +157,8 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 		case 0x04:
 		{
 			// Heartbeat
-			//ESP_LOGD("broan","Got 0x04 heartbeat");
 			send({0x05});
-			m_nNextPing = millis() + 100 ;
+			m_nNextPing = millis();
 			//send({0x04});
 			break;
 		}
@@ -166,7 +168,6 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 
 		case 0x40:
 		{
-			ESP_LOGD("broan","0x40 message");
 			//send({0x41, 0x00, 0x50, 0x00});
 			break;
 		}
@@ -191,19 +192,10 @@ void BroanComponent::runRequests()
 {
 	uint32_t time = millis();
 
-	// Ping the ERV (Is this actually needed?)
-	if( m_nNextPing > 0 && millis() > m_nNextPing )
-	{
-		send({0x04});
-		m_nNextPing = 0;
-
-		if( m_nNextQuery == 0 )
-			m_nNextQuery = millis() + 1000;
-	}
-
 	// Request new data
 	if( m_nNextQuery > 0 && time > m_nNextQuery )
 	{
+		//ESP_LOGD("broan", "Reading values" );
 		m_nNextQuery = time + 500;
 
 		m_vecFields[FanMode].m_bStale = true;
@@ -232,7 +224,22 @@ void BroanComponent::runRequests()
 			send(request);
 		//ESP_LOGD("broan", "Sending 0x20 request..." );
 
+		return;
 	}
+
+	// Ping the ERV (Is this actually needed?)
+	if( m_nNextPing > 0 && millis() >= m_nNextPing )
+	{
+		//ESP_LOGD("broan", "Pinging" );
+		send({0x04});
+		m_nNextPing = 0;
+
+		if( m_nNextQuery == 0 )
+			m_nNextQuery = millis() + 1000;
+
+		return;
+	}
+
 }
 
 void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
