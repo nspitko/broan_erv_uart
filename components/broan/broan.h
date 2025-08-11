@@ -2,12 +2,23 @@
 
 #include "esphome.h"
 #include "esphome/core/component.h"
+
+#ifdef USE_SELECT
+#include "esphome/components/select/select.h"
+#endif
+
 #include "esphome/components/uart/uart.h"
+
 
 namespace esphome {
 namespace broan {
 
 #define BROAN_NUM_FIELDS 25
+
+template<typename T>
+concept BroanFieldTypes = 	std::is_same_v<T, float> ||
+							std::is_same_v<T, uint8_t> ||
+							std::is_same_v<T, uint32_t>;
 
 enum BroanFieldType
 {
@@ -16,36 +27,62 @@ enum BroanFieldType
 	Byte,
 };
 
+enum BroanFanMode
+{
+	Off,
+	Min,
+	Max,
+	Custom,
+};
+
 enum BroanField
 {
-	Uptime = 20,
+	FanMode = 19, // 0x0A for max, 0x09 for min, 0x0B for variable, and 0x01 for off
+	Uptime = 20, // In seconds?
+	FanSpeed = 23, // Fan speed
+	FanSpeedB = 7, // Also Fan speed?
 };
 
 struct BroanField_t
 {
-	uint8_t opcodeHigh;
-	uint8_t opcodeLow;
+	uint8_t m_nOpcodeHigh;
+	uint8_t m_nOpcodeLow;
 
-	uint8_t type;
+	uint8_t m_nType;
 
 	union {
-		char bytes[4];
-		float floatVal;
-		uint32_t intVal;
-		uint8_t byteVal;
-	} value;
+		char m_rgBytes[4];
+		float m_flValue;
+		uint32_t m_nValue;
+		uint8_t m_chValue;
+	} m_value;
+
+	bool m_bStale = true;
+
+	// Totally safe blind copy of the incoming value.
+	BroanField_t copyForUpdate(BroanFieldTypes auto const &newVal) const
+	{
+		BroanField_t copy = *this;
+
+		size_t len = (m_nType == static_cast<uint8_t>(BroanFieldType::Byte)) ? 1 : 4;
+		std::memcpy(copy.m_value.m_rgBytes, &newVal, len);
+
+		return copy;
+	}
 
 };
 
-class Broan : public Component, public uart::UARTDevice
+class BroanComponent : public Component, public uart::UARTDevice
 {
+
+#ifdef USE_SELECT
+	SUB_SELECT(fan_mode)
+#endif
 public:
-	Broan(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}  // Note the correct namespace
+	uint8_t m_nServerAddress = 0x10;
+	uint8_t m_nClientAddress = 0x11;
 
-	uint8_t server_address = 0x10;
-	uint8_t my_address = 0x11;
-
-	BroanField_t fields[BROAN_NUM_FIELDS] = {
+	BroanField_t m_vecFields[BROAN_NUM_FIELDS] = {
 		{ 0x0F, 0x50, BroanFieldType::Float, {0} }, // Upper CFM?. 175 / 00002f43
 		{ 0x0E, 0x50, BroanFieldType::Float, {0} }, // Upper CFM?. 175 / 00002f43
 		{ 0x0B, 0x50, BroanFieldType::Float, {0} }, // Lower CFM?. 32 / 00000042
@@ -66,7 +103,7 @@ public:
 		{ 0x04, 0x21, BroanFieldType::Byte, {0} }, // Unknown. 0 / 00
 		{ 0x02, 0x20, BroanFieldType::Byte, {0} }, // Unknown. 1 / 01
 		{ 0x00, 0x20, BroanFieldType::Byte, {0} }, // Unknown. 20 / 14
-		{ 0x14, 0x00, BroanFieldType::Int, {0} }, // Uptime (Seconds)
+		{ 0x14, 0x00, BroanFieldType::Int, {0} },
 		{ 0x17, 0x00, BroanFieldType::Int, {0} }, // Unknown. NaN / ffffffff
 		{ 0x00, 0x30, BroanFieldType::Byte, {0} }, // Unknown. 0 / 00
 		{ 0x08, 0x22, BroanFieldType::Float, {0} }, // Unknown. 175 / 00002f43
@@ -74,29 +111,45 @@ public:
 	};
 
 
-	uint32_t next_ping = 0;
-	uint32_t next_query = 0;
-	bool erv_ready = false;
-	uint8_t query_cursor = 0;
+	uint32_t m_nNextPing = 0;
+	uint32_t m_nNextQuery = 0;
+	bool m_bERVReady = false;
+	uint8_t m_nQueryCursor = 0;
 
 
 
-	std::vector<uint8_t> header;
-	bool haveHeader = false;
+	std::vector<uint8_t> m_vecHeader;
+	bool m_bHaveHeader = false;
 
 	// uart overrides
 	void setup() override;
 	void loop() override;
 
+public:
+	// get/set
+	void setFanMode( std::string mode );
+	void setFanSpeed( float speed );
+
+
+private:
 	// Internal
-	bool read_header();
-	bool read_message();
-	void handle_message(uint8_t sender, uint8_t target, const std::vector<uint8_t>& message);
+	bool readHeader();
+	bool readMessage();
+	void handleMessage(uint8_t sender, uint8_t target, const std::vector<uint8_t>& message);
 	void send(const std::vector<uint8_t>& msg);
-	int peek_byte();
-	uint8_t calculate_checksum(uint8_t sender, uint8_t receiver, const std::vector<uint8_t>& message);
+	uint8_t calculateChecksum(uint8_t sender, uint8_t receiver, const std::vector<uint8_t>& message);
 	void runRequests();
 	void parseBroanFields(const std::vector<uint8_t>& message);
+	void writeRegisters( const std::vector<BroanField_t> &values );
+
+	float remap(float flIn, float flInMin, float flInMax, float flOutMin, float flOutMax) {
+  		return (flIn - flInMin) * (flOutMax - flOutMin) / (flInMax - flInMin) + flOutMin;
+	}
+
+
+protected:
+	std::string fan_mode_{};
+
 };
 
 }  // namespace broan
