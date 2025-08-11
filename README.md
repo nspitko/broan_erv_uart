@@ -1,14 +1,15 @@
 # Broan ERV serial component
 
-This is a work in progress. Currently all it does is scan known registers and spit out the data, so you can fiddle with stuff on your ERV and see how the values change.
+!! This is a work in progress !!
 
-Theree is some kind of protocol bug right now that causes random misalignment. The code corrects for this but it means some messages get lost, this means it may take several seconds for a value to make its way through to the log.
+Theree is some kind of protocol bug right now that causes random misalignment. The code corrects for this but it means some messages get lost, this means it may take several seconds for a value to make its way through.
 
 If you'd like to help, flash this to an esp32 with a rs485 tranceiver, open up the web log, change values and settings on your erv, and note which values change and to what. Please open up an issue with any reporting so we can lock down what each register does.
 
 Additionally, if you want to do packet capture and have a wall remote, we may be able to discover new registers. I'm sure we're missing at least some, as I don't see current CFM reflected in the dataset currently.
 
-Here's an ESPHome config for the esp32-s3-6ch-relay board waveshare makes.
+Here's an ESPHome config for the esp32-s3-6ch-relay board waveshare makes. Currently it only supports setting fan mode. You'll need to update the external component to point to your local checkout of this repo.
+
 ### ESPhome yaml
 ```
 esphome:
@@ -56,5 +57,11 @@ uart:
 
 broan:
   uart_id: rs485
+
+select:
+  - platform: broan
+    fan_mode:
+      name: "fan mode"
+    
     
 ```
