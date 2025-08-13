@@ -13,6 +13,10 @@ void BroanComponent::setFanMode( std::string mode )
 		value = 0x0a;
 	else if( mode == "manual" )
 		value = 0x0b;
+	else if( mode == "int" )
+		value = 0x08;
+	else if( mode == "turbo" )
+		value = 0x0c;
 	else
 		value = 0x01;
 
@@ -38,6 +42,42 @@ void BroanComponent::setFanSpeed( float input )
 
 	m_vecFields[FanSpeed].m_bStale = true;
 	m_vecFields[FanSpeedB].m_bStale = true;
+
+	writeRegisters( vecFields );
+
+}
+
+
+void BroanComponent::setFanSpeedCFM( BroanFanMode mode, BroanCFMMode direction, float flTargetCFM )
+{
+	std::vector<BroanField_t> vecFields;
+
+
+	switch( mode )
+	{
+		case BroanFanMode::Max:
+		{
+			if( ( direction & BroanCFMMode::Input ) != 0 )
+				vecFields.push_back( m_vecFields[CFMIn_Max].copyForUpdate( flTargetCFM ) );
+			if( ( direction & BroanCFMMode::Output ) != 0 )
+				vecFields.push_back( m_vecFields[CFMOut_Max].copyForUpdate( flTargetCFM ) );
+		}
+		break;
+
+		case BroanFanMode::Min:
+		{
+			if( ( direction & BroanCFMMode::Input ) != 0 )
+				vecFields.push_back( m_vecFields[CFMIn_Max].copyForUpdate( flTargetCFM ) );
+			if( ( direction & BroanCFMMode::Output ) != 0 )
+				vecFields.push_back( m_vecFields[CFMOut_Max].copyForUpdate( flTargetCFM ) );
+		}
+		break;
+
+
+		default:
+			ESP_LOGW("broan","Unhandled: Setting fan speed limits for  mode %02X", mode );
+
+	}
 
 	writeRegisters( vecFields );
 

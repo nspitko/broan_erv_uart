@@ -25,8 +25,9 @@ void BroanComponent::loop()
 		if( !bRead ) break;
 	}
 
-	if( bCanSend )
-		runRequests();
+	replyIfAllowed();
+
+	runTasks();
 }
 
 bool BroanComponent::readHeader()
@@ -85,7 +86,7 @@ void BroanComponent::writeRegisters( const std::vector<BroanField_t> &values )
 			message.push_back( value.m_value.m_rgBytes[i] );
 	}
 
-	send( message );
+	queueMessage( message );
 }
 
 bool BroanComponent::readMessage()
@@ -148,34 +149,52 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 			// Respond to ping
 			std::vector<uint8_t> reply = {0x03};
 			reply.insert(reply.end(), message.begin() + 1, message.end());
+
 			send(reply);
+
 			ESP_LOGD("broan","0x02 Ping");
 			m_bERVReady = true;
-
 			break;
 		}
 		case 0x04:
 		{
-			// Heartbeat
-			send({0x05});
-			m_nNextPing = millis();
-			//send({0x04});
+			// Flow control
+			m_nLastHadControl = millis();
+			m_bHaveControl = true;
+			m_bExpectingReply = false;
+			// ERV won't re-ping us if we drop, so just assume if we're getting flow
+			// control messages it's ready for us to start feeding it data.
+			m_bERVReady = true;
+
+			// Ack that we have control. We'll send any queued messages then release with 0x04
+			send({ 0x05 });
 			break;
 		}
 		case 0x05:
-			//ESP_LOGD("broan","Got 0x05 heartbeat response");
+			// ERV has confirmed it has control, no-op
 			break;
 
-		case 0x40:
+		case 0x41:
 		{
-			//send({0x41, 0x00, 0x50, 0x00});
+			// set register ACK, mark all fields dirty
+			for( int i=1; i<message.size(); i+=2)
+			{
+				BroanField_t *pField = lookupField(message[i], message[i+1]);
+				if( !pField )
+				{
+					ESP_LOGW("broan", "Got write response for unknown field %02X %02X", message[i], message[i+1]);
+					continue;
+				}
+				pField->m_bStale = true;
+			}
+			m_bExpectingReply = false;
 			break;
 		}
 		case 0x21:
 		{
-			//ESP_LOGD("broan","0x21 response");
-
+			// Request register response
 			parseBroanFields(message);
+			m_bExpectingReply = false;
 
 			break;
 		}
@@ -183,64 +202,49 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 		{
 			// Log unhandled m_nType
 			ESP_LOGW("broan", "Unhandled m_nType %02X", m_nType);
+			ESP_LOG_BUFFER_HEX_LEVEL("broan", message.data(), message.size(), ESP_LOG_WARN);
 			break;
 		}
 	}
 }
 
-void BroanComponent::runRequests()
+void BroanComponent::replyIfAllowed()
 {
 	uint32_t time = millis();
-
-	// Request new data
-	if( m_nNextQuery > 0 && time > m_nNextQuery )
+	if( m_nLastHadControl + CONTROL_TIMEOUT < time )
 	{
-		//ESP_LOGD("broan", "Reading values" );
-		m_nNextQuery = time + 500;
+		ESP_LOGW("broan","ERV has not yielded control in over %ims, taking control", CONTROL_TIMEOUT);
+		m_bHaveControl = true;
+		m_bExpectingReply = false;
+	}
 
-		m_vecFields[FanMode].m_bStale = true;
-		m_vecFields[FanSpeed].m_bStale = true;
-		m_vecFields[FanSpeedB].m_bStale = true;
+	if( !m_bHaveControl || m_bExpectingReply )
+		return;
 
-		std::vector<unsigned char> request;
-		request.push_back(0x20);
-		int count = 0;
-		// Only check 10 fields at a time. Not sure if this is actually useful?
-		// We don't know the message length limit yet.
-		for( int i=0; i<BROAN_NUM_FIELDS; i++ )
-		{
-			if( !m_vecFields[i].m_bStale )
-				continue;
-
-			count++;
-
-			m_vecFields[i].m_bStale = false;
-
-			request.push_back( m_vecFields[i].m_nOpcodeHigh );
-			request.push_back( m_vecFields[i].m_nOpcodeLow );
-		}
-
-		if( request.size() > 0 )
-			send(request);
-		//ESP_LOGD("broan", "Sending 0x20 request..." );
-
+	if( m_vecSendQueue.size() > 0 )
+	{
+		send( m_vecSendQueue.front() );
+		m_vecSendQueue.pop_front();
+		m_bExpectingReply = true;
 		return;
 	}
 
-	// Ping the ERV (Is this actually needed?)
-	if( m_nNextPing > 0 && millis() >= m_nNextPing )
+	if( m_bHaveControl && !m_bExpectingReply && m_vecSendQueue.size() == 0 )
 	{
-		//ESP_LOGD("broan", "Pinging" );
-		send({0x04});
-		m_nNextPing = 0;
-
-		if( m_nNextQuery == 0 )
-			m_nNextQuery = millis() + 1000;
-
+		// Release control.
+		send( { 0x04 } );
+		m_bHaveControl = false;
+		m_bERVReady = true;
 		return;
 	}
 
 }
+
+void BroanComponent::queueMessage(std::vector<uint8_t>& message)
+{
+	m_vecSendQueue.push_back(message);
+}
+
 
 void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 {
@@ -274,9 +278,12 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 						std::string strMode;
 						switch( field.m_value.m_chValue )
 						{
+							case 0x08: strMode = "int"; break;
 							case 0x09: strMode = "min"; break;
 							case 0x0a: strMode = "max"; break;
 							case 0x0b: strMode = "manual"; break;
+							case 0x0c: strMode = "turbo"; break;
+
 							default: strMode = "off"; break;
 						}
 
@@ -341,6 +348,49 @@ uint8_t BroanComponent::calculateChecksum(uint8_t sender, uint8_t receiver, cons
 	for (uint8_t b : message) total += b;
 	return 0xFF & (0 - (total - 1));
 }
+
+BroanField_t* BroanComponent::lookupField( uint8_t opcodeHigh, uint8_t opcodeLow )
+{
+	for( BroanField_t &f : m_vecFields )
+	{
+		if( f.m_nOpcodeHigh == opcodeHigh && f.m_nOpcodeLow == opcodeLow )
+			return &f;
+	}
+
+	return nullptr;
+}
+
+void BroanComponent::runTasks()
+{
+	uint32_t time = millis();
+	// Request new data
+	if( m_bERVReady && time > m_nNextQuery )
+	{
+		//ESP_LOGD("broan", "Reading values" );
+		m_nNextQuery = time + 500;
+
+		std::vector<unsigned char> request;
+		request.push_back(0x20);
+
+
+		for( int i=0; i<BROAN_NUM_FIELDS; i++ )
+		{
+			if( !m_vecFields[i].m_bStale && !m_vecFields[i].m_bPoll )
+				continue;
+
+			m_vecFields[i].m_bStale = false;
+
+			request.push_back( m_vecFields[i].m_nOpcodeHigh );
+			request.push_back( m_vecFields[i].m_nOpcodeLow );
+		}
+
+		if( request.size() > 0 )
+		{
+			queueMessage(request);
+		}
+	}
+}
+
 
 
 }
