@@ -13,7 +13,7 @@
 namespace esphome {
 namespace broan {
 
-#define BROAN_NUM_FIELDS 27
+#define BROAN_NUM_FIELDS 29
 #define CONTROL_TIMEOUT 5000
 
 template<typename T>
@@ -54,6 +54,7 @@ enum BroanField
 	FanSpeedB = 3, // Also Fan speed?
 	CFMIn_Max = 4,
 	CFMOut_Max = 5,
+	Wattage = 8,
 };
 
 struct BroanField_t
@@ -90,6 +91,10 @@ struct BroanField_t
 class BroanComponent : public Component, public uart::UARTDevice
 {
 
+#ifdef USE_SENSOR
+	SUB_SENSOR(power)
+#endif
+
 #ifdef USE_SELECT
 	SUB_SELECT(fan_mode)
 #endif
@@ -112,7 +117,7 @@ public:
 		{ 0x0E, 0x50, BroanFieldType::Float, {0}, true }, // MAX target CFM out.
 		{ 0x0B, 0x50, BroanFieldType::Float, {0}, true }, // MIN target CFM in.
 		{ 0x0A, 0x50, BroanFieldType::Float, {0}, true }, // MIN target CFM out.
-
+		{ 0x23, 0x50, BroanFieldType::Float, {0}, true }, // Wattage?  23.337730 on min, 28 on max 7 on stb,  / 1102754732 Reads kind of high for intake temp but docs mention it reads high so maybe?
 
 
 		// Unknown fields
@@ -135,7 +140,11 @@ public:
 		{ 0x00, 0x30, BroanFieldType::Byte, {0} }, // Unknown. 0 / 00
 		{ 0x00, 0x22, BroanFieldType::Int, {0} }, // Unknown. 14400 / 40380000
 		{ 0x07, 0x50, BroanFieldType::Int, {0} }, // Unknown. Remote regularly sets this to -1
-		{ 0x03, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering INT mode
+		{ 0x03, 0x20, BroanFieldType::Byte, {0}, false }, // Unknown. Set to 0 when entering INT mode
+
+
+		{ 0x08, 0x30, BroanFieldType::Int, {0} }, // Unknown. Seems to change a lot. 0 / 3808569
+
 	};
 
 	// uart overrides
@@ -154,7 +163,12 @@ private:
 	uint32_t m_nNextQuery = 0;
 
 	bool m_bERVReady = false;
-	uint8_t m_nQueryCursor = 0;
+
+	// Field scanner
+	uint32_t m_nNextScan = 0;
+	uint8_t m_nFieldCursor = 0;
+	uint8_t m_nGroupCursor = 0x20;
+	std::map<uint16_t, BroanField_t> m_vecFieldData;
 
 	std::vector<uint8_t> m_vecHeader;
 	bool m_bHaveHeader = false;
@@ -190,6 +204,7 @@ protected:
 	// esphome glue
 	std::string fan_mode_{};
 	float fan_speed_{0.f};
+	float power_{0.f};
 
 
 };

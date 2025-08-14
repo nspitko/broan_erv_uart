@@ -57,7 +57,7 @@ bool BroanComponent::readHeader()
 	}
 
 	uint8_t head = m_vecHeader[0];
-	if ( m_vecHeader[1] > 32 || m_vecHeader[2] > 32 || m_vecHeader[4] > 0x7F)
+	if ( m_vecHeader[1] > 32 || m_vecHeader[2] > 32 )
 	{
 		ESP_LOGW("broan", "Alignment: Unexpected %02X %02X %02X %02X %02X",
 			m_vecHeader[0], m_vecHeader[1], m_vecHeader[2], m_vecHeader[3], m_vecHeader[4]);
@@ -252,15 +252,15 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 
     while (i < message.size())
     {
-        uint8_t m_nOpcodeHigh = message[i++];
-        uint8_t m_nOpcodeLow  = message[i++];
+        uint8_t nOpcodeHigh = message[i++];
+        uint8_t nOpcodeLow  = message[i++];
 		size_t len = message[i++];
 		bool bFound = false;
 
 		for( int j=0; j<BROAN_NUM_FIELDS; j++)
 		{
 			BroanField_t &field = m_vecFields[j];
-			if( field.m_nOpcodeHigh == m_nOpcodeHigh && field.m_nOpcodeLow == m_nOpcodeLow )
+			if( field.m_nOpcodeHigh == nOpcodeHigh && field.m_nOpcodeLow == nOpcodeLow )
 			{
 				uint32_t oldVal = field.m_value.m_nValue;
      			for (size_t b = 0; b < len; ++b)
@@ -295,6 +295,9 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 						float flAdjusted = remap( field.m_value.m_flValue, 32.f, 175.f, 0.f, 100.f );
 						fan_speed_number_->publish_state(flAdjusted);
 					}
+
+					case BroanField::Wattage:
+						power_sensor_->publish_state(field.m_value.m_flValue);
 					break;
 				}
 
@@ -303,13 +306,13 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				switch( field.m_nType )
 				{
 					case BroanFieldType::Byte:
-						ESP_LOGD("broan","%02X%02X is now Byte  %02X", m_nOpcodeHigh, m_nOpcodeLow, m_vecFields[j].m_value.m_chValue );
+						ESP_LOGD("broan","%02X%02X is now Byte  %02X", nOpcodeHigh, nOpcodeLow, m_vecFields[j].m_value.m_chValue );
 						break;
 					case BroanFieldType::Int:
-						ESP_LOGD("broan","%02X%02X is now Int %i", m_nOpcodeHigh, m_nOpcodeLow, m_vecFields[j].m_value.m_nValue );
+						ESP_LOGD("broan","%02X%02X is now Int %i", nOpcodeHigh, nOpcodeLow, m_vecFields[j].m_value.m_nValue );
 						break;
 					case BroanFieldType::Float:
-						ESP_LOGD("broan","%02X%02X is now Float %f", m_nOpcodeHigh, m_nOpcodeLow, m_vecFields[j].m_value.m_flValue );
+						ESP_LOGD("broan","%02X%02X is now Float %f", nOpcodeHigh, nOpcodeLow, m_vecFields[j].m_value.m_flValue );
 						break;
 				}
 
@@ -318,7 +321,53 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 		}
 
 		if( !bFound )
-			ESP_LOGW("broan","Got unexpected field response for opcode %02X%02X", m_nOpcodeHigh, m_nOpcodeLow );
+		{
+			uint16_t kv = ( nOpcodeHigh << 8 ) | nOpcodeLow;
+
+			if( m_vecFieldData.contains( kv ) )
+			{
+				BroanField_t copy = m_vecFieldData[ kv ];
+
+				for (size_t b = 0; b < len && b < 4; ++b)
+            		m_vecFieldData[kv].m_value.m_rgBytes[b] = static_cast<char>(message[i+b]);
+
+				if( m_vecFieldData[kv].m_value.m_nValue != copy.m_value.m_nValue )
+				{
+
+
+					if( len == 4)
+						ESP_LOGD("broan","%02X%02X field is unmapped. Value: %f / %i -->  %f / %i", nOpcodeHigh, nOpcodeLow,
+							copy.m_value.m_flValue, copy.m_value.m_nValue,
+							m_vecFieldData[kv].m_value.m_flValue, m_vecFieldData[kv].m_value.m_nValue ) ;
+					else if (len == 1)
+						ESP_LOGD("broan","%02X%02X field is unmapped. Value: %f / %i -->  %f / %i", nOpcodeHigh, nOpcodeLow,
+							copy.m_value.m_flValue, copy.m_value.m_nValue,
+							m_vecFieldData[kv].m_value.m_flValue, m_vecFieldData[kv].m_value.m_nValue ) ;
+				}
+			}
+			else
+			{
+				BroanField_t newField;
+				newField.m_nOpcodeHigh = nOpcodeHigh;
+				newField.m_nOpcodeLow = nOpcodeLow;
+				newField.m_nType = len == 4 ? BroanFieldType::Float : BroanFieldType::Byte;
+
+				for (size_t b = 0; b < len && b < 4; ++b)
+            		newField.m_value.m_rgBytes[b] = static_cast<char>(message[i+b]);
+
+
+				if( len == 4)
+					ESP_LOGD("broan","%02X%02X field is unmapped. Value: %f / %i", nOpcodeHigh, nOpcodeLow, newField.m_value.m_flValue, newField.m_value.m_nValue );
+				else if( len == 1 )
+					ESP_LOGD("broan","%02X%02X field is unmapped. Value: %i", nOpcodeHigh, nOpcodeLow, newField.m_value.m_chValue);
+				else
+					ESP_LOGD("broan","%02X%02X has unhandled field length %i: %s", nOpcodeHigh, nOpcodeLow, len, format_hex_pretty(&message[i], len).c_str() );
+
+				m_vecFieldData[kv] = newField;
+
+			}
+
+		}
 
         i += len;
     }
@@ -387,6 +436,49 @@ void BroanComponent::runTasks()
 		{
 			queueMessage(request);
 		}
+		return;
+	}
+
+	if( m_nNextScan == 0 )
+		m_nNextScan	= time + 15000;
+
+	if( m_bERVReady && time > m_nNextScan )
+	{
+		m_nNextScan = time + 100;
+
+		std::vector<unsigned char> request;
+		request.push_back(0x20);
+
+		for( int i=0; i<15;i++)
+		{
+			request.push_back(m_nFieldCursor);
+			request.push_back(m_nGroupCursor);
+
+
+			if( m_nFieldCursor == 0xFF)
+			{
+
+				switch( m_nGroupCursor )
+				{
+					case 0x20: m_nGroupCursor = 0x21; break;
+					case 0x21: m_nGroupCursor = 0x22; break;
+					case 0x22: m_nGroupCursor = 0x30; break;
+					case 0x30: m_nGroupCursor = 0x40; break;
+					case 0x40: m_nGroupCursor = 0x50; break;
+					case 0x50: m_nGroupCursor = 0x60; break;
+					case 0x60: m_nGroupCursor = 0xE0; break;
+					case 0xE0: m_nGroupCursor = 0x20; break;
+					//case 0xF0: m_nGroupCursor = 0x20; break;
+				}
+				//ESP_LOGD("broan","Brute force: Group is now %02X ", m_nGroupCursor );
+			}
+			m_nFieldCursor++;
+		}
+
+		queueMessage(request);
+
+
+
 	}
 }
 

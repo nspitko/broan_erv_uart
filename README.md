@@ -62,4 +62,9 @@ number:
     fan_speed:
       name: "fan speed"
 
+sensor:
+  - platform: broan
+    power:
+      name: Power draw
+
 ```
