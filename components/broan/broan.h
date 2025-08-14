@@ -14,7 +14,7 @@ namespace esphome {
 namespace broan {
 
 #define BROAN_NUM_FIELDS 27
-#define CONTROL_TIMEOUT 500
+#define CONTROL_TIMEOUT 5000
 
 template<typename T>
 concept BroanFieldTypes = 	std::is_same_v<T, float> ||

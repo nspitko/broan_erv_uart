@@ -32,7 +32,9 @@ async def to_code(config):
                 "off",
                 "min",
                 "max",
+                "int",
                 "manual",
+                "turbo",
             ],
         )
         await cg.register_parented(s, config[CONF_BROAN_ID])
