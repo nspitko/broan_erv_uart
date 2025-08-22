@@ -9,6 +9,8 @@ from esphome.const import (
     UNIT_PERCENT,
 )
 
+UNIT_CFM = "CFM"
+
 from .. import CONF_BROAN_ID, BroanComponent, broan_ns
 
 FanSpeedNumber = broan_ns.class_("FanSpeedNumber", number.Number)

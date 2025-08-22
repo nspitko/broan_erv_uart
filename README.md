@@ -14,18 +14,25 @@ Right now we're mostly missing information on which registers do what. If you ha
 3) You will ideally want to power this directly from the 12v output on the erv itself. this isn't a hard requirement but if the ERV is power cycled it make take some time for things to re-intitialize. It's generally OK to restart the ESP at any time though. Some devices support this out of the box, but most do not, so if you're not using the waveshare device you'll want a buck converter.
 
 ## Supported features
-* Setting fan mode (Standby, Min, Max, Intermittent, Turbo, and Manual)
+* Setting fan mode (Standby, Min, Max, Intermittent, Turbo, and Med, which is treated as manual control)
 * Setting fan speed in manual mode
+* Intake temperature
+* Filter life left
 
-More features will be added if we can get serial dumps from more advanced units, or get lucky with brute forcing.
-
+More features will be added as time allows. I've documented many fields that aren't supported yet.
 
 ## FAQ
 Q: I see errors about failed communication
-A: Disconnect your wall remote and restart the ERV. the wall remote will consume a different ID and the ERV will never talk to the ESP32 until restarted.
+
+A: Either you have the RS495 wires reversed, or you didn't restart the ERV after connecting the ESP32.
 
 Q: Why doesn't it support X?
-A: We most likely need serial capture from a wall remote and/or ERV with that feature. If you have a VTTOUCHW and can do rs485 serial capture, we need dumps that contain: 5 seconds of initial state, then press the button you want supported, then 5-10 more seconds (as long as it takes the ERV to finish doing whatever it's doing). Open an issue and attach the dumps. It's possible to get packet capture by uncommenting the debug section in the uart block below, and commenting out the broan component. the main drawback to this is just it's annoying to get all of the data out of the web console.
+
+A: Maybe! Not everything is actually exposed, like the life CFM readings much to my chagrin. For other stuff, I may need dumps from a unit with the feature you're requesting, or it might already be exposed and just needs to be plumbed though. Feel free to open an issue or PR
+
+Q: What if I still want wall controls?
+
+A: You can use the aux remotes, those use the dry contact interface which is a hard override. This is how Broan bypasses the protocol limitation.
 
 ### ESPhome yaml
 Add this to an existing config.
@@ -66,5 +73,9 @@ sensor:
   - platform: broan
     power:
       name: Power draw
+    temperature:
+      name: Temperature
+    filter_life:
+      name: Remaining Filter life
 
 ```

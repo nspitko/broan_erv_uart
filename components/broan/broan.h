@@ -13,8 +13,18 @@
 namespace esphome {
 namespace broan {
 
-#define BROAN_NUM_FIELDS 29
 #define CONTROL_TIMEOUT 5000
+#define UPDATE_RATE 1000
+
+#define UPDATE_RATE_FAST 3000
+#define UPDATE_RATE_SLOW 60000
+#define UPDATE_RATE_NEVER 0xFFFFFFFF
+
+#define MAX_REQUEST_SIZE 10
+#define INVALID_FIELD 0xFFFFFF
+
+//#define SCAN_UNKNOWN 1
+//#define LISTEN_ONLY 1
 
 template<typename T>
 concept BroanFieldTypes = 	std::is_same_v<T, float> ||
@@ -26,6 +36,7 @@ enum BroanFieldType
 	Float,
 	Int,
 	Byte,
+	Void,
 };
 
 enum BroanCFMMode
@@ -41,20 +52,51 @@ enum BroanFanMode
 	Intermittent = 0x08,
 	Min = 0x09,
 	Max = 0x0a,
+	Smart = 0x11,
 	Manual = 0x0b,
 	Turbo = 0x0c,
+	Away = 0x0F, // "OTH", no idea what this actually does?
 
 };
 
 enum BroanField
 {
-	FanMode = 0, // 0x0A for max, 0x09 for min, 0x0B for variable, and 0x01 for off
-	Uptime = 1, // In seconds?
-	FanSpeed = 2, // Fan speed
-	FanSpeedB = 3, // Also Fan speed?
-	CFMIn_Max = 4,
-	CFMOut_Max = 5,
-	Wattage = 8,
+	// Control
+	FanMode = 0,
+	HumidityControl,
+	IntModeDuration,
+	CurrentHumidityA, // Set both to same value per VTSPEEDW
+	CurrentHumidityB,
+
+	// Info
+	Uptime, // In seconds?
+	Wattage,
+	TemperatureA,
+	TemperatureB,
+
+	// Speeds
+	CFMIn_Medium,
+	CFMOut_Medium,
+	CFMIn_Max,
+	CFMOut_Max,
+	CFMIn_Min,
+	CFMOut_Min,
+
+	// Input
+	Heartbeat, // Weird void value that controllers ping every 10s
+	ControllerHumidity,
+	ControllerTemperature,
+
+	// Maintenance
+	FilterReset, // Set to 1 to reset
+	FilterLife, // default 7884000 / 3 months
+
+	// Unknown fields that look interesting but aren't understood nor read by controllers
+	UnknownA,
+	UnknownB,
+
+	MAX_FIELDS,
+
 };
 
 struct BroanField_t
@@ -71,9 +113,8 @@ struct BroanField_t
 		uint8_t m_chValue;
 	} m_value;
 
-	bool m_bPoll = false;
-	bool m_bStale = true;
-
+	uint32_t m_unPollRate = UPDATE_RATE_SLOW;
+	uint32_t m_unLastUpdate = 0;
 
 	// Totally safe blind copy of the incoming value.
 	BroanField_t copyForUpdate(BroanFieldTypes auto const &newVal) const
@@ -93,6 +134,8 @@ class BroanComponent : public Component, public uart::UARTDevice
 
 #ifdef USE_SENSOR
 	SUB_SENSOR(power)
+	SUB_SENSOR(temperature)
+	SUB_SENSOR(filter_life)
 #endif
 
 #ifdef USE_SELECT
@@ -107,23 +150,51 @@ public:
 	const uint8_t m_nServerAddress = 0x10;
 	const uint8_t m_nClientAddress = 0x12;
 
-	BroanField_t m_vecFields[BROAN_NUM_FIELDS] = {
+
+	bool m_bWaitForRemote = false;
+
+
+	BroanField_t m_vecFields[BroanField::MAX_FIELDS] = {
 		// Known fields
-		{ 0x00, 0x20, BroanFieldType::Byte, {0}, true }, // FanMode
-		{ 0x14, 0x00, BroanFieldType::Int, {0} }, // Uptime (Seconds)
-		{ 0x08, 0x22, BroanFieldType::Float, {0}, true }, // Fan speed 32 - 175
-		{ 0x06, 0x22, BroanFieldType::Float, {0}, true }, // Fan speed 32 - 175 .. Unsure how these are different, related to INT mode?
-		{ 0x0F, 0x50, BroanFieldType::Float, {0}, true }, // MAX target CFM in.
-		{ 0x0E, 0x50, BroanFieldType::Float, {0}, true }, // MAX target CFM out.
-		{ 0x0B, 0x50, BroanFieldType::Float, {0}, true }, // MIN target CFM in.
-		{ 0x0A, 0x50, BroanFieldType::Float, {0}, true }, // MIN target CFM out.
-		{ 0x23, 0x50, BroanFieldType::Float, {0}, true }, // Wattage?  23.337730 on min, 28 on max 7 on stb,  / 1102754732 Reads kind of high for intake temp but docs mention it reads high so maybe?
+		// Control
+		{ 0x00, 0x20, BroanFieldType::Byte, {0}, UPDATE_RATE_FAST }, // FanMode
+		{ 0x0F, 0x22, BroanFieldType::Byte, {0}, UPDATE_RATE_SLOW }, // Humidity control on/off
+		{ 0x02, 0x22, BroanFieldType::Int, {0}, UPDATE_RATE_SLOW }, // INT mode on time (seconds, OFF time will be what remains of an hour)
+		{ 0x0C, 0x22, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // Target humidity?
+		{ 0x0A, 0x22, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // Target humidity? (These are set together)
 
 
-		// Unknown fields
+		// Info
+		{ 0x14, 0x00, BroanFieldType::Int, {0}, UPDATE_RATE_SLOW }, // Uptime (Seconds)
+		{ 0x23, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Power draw (Watts)
+		{ 0x01, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (B150E75NT)
+		{ 0x03, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (BLP150E75NS)
 
-		{ 0x02, 0x30, BroanFieldType::Byte, {0}, true }, // Unknown. 1. Set to 0 in TURBO mode
-		{ 0x0F, 0x22, BroanFieldType::Byte, {0} }, // Unknown. 0 / 00
+		// Speeds
+		{ 0x06, 0x22, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // MED target CFM in.
+		{ 0x08, 0x22, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // MED target CFM out.
+		{ 0x0E, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // MAX target CFM in.
+		{ 0x0F, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // MAX target CFM out.
+		{ 0x0A, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // MIN target CFM in.
+		{ 0x0B, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // MIN target CFM out.
+
+		//Input
+		{ 0x00, 0x50, BroanFieldType::Void, {0}, UPDATE_RATE_NEVER }, // Unknown. Controllers regularly write this. Some kind of heartbeat maybe?
+		{ 0x04, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_NEVER }, // Controller Humidity (Write only)
+		{ 0x05, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_NEVER }, // Controller temperature (Write only)
+
+		// Maintenance
+		{ 0x09, 0x30, BroanFieldType::Byte, {0}, UPDATE_RATE_SLOW }, // Set to 0x01 to reset filter
+		{ 0x08, 0x30, BroanFieldType::Int, {0}, UPDATE_RATE_SLOW }, // Number of seconds until filter needs reset. Set along side reset byte
+
+
+		// Interesting fields found by scan
+		{ 0x08, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // Unknown. Seems to change a lot. 38.943115 / 1109116352 (Does not correlate with fan speed)
+		{ 0x09, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // Unknown. Seems to change a lot. 36.360962 / 1108439456 (Same as above)
+
+/*
+		// Unknown fields scanned by the VTSPEEDW
+		{ 0x02, 0x30, BroanFieldType::Byte, {0}, UPDATE_RATE_SLOW }, // Unknown. 1. Set to 0 in TURBO mode
 		{ 0x0A, 0x22, BroanFieldType::Float, {0} }, // Unknown. 40 / 00002042
 		{ 0x0E, 0x21, BroanFieldType::Byte, {0} }, // Unknown. 1 / 01
 		{ 0x0C, 0x21, BroanFieldType::Byte, {0} }, // Unknown. 1 / 01
@@ -139,11 +210,10 @@ public:
 		{ 0x17, 0x00, BroanFieldType::Int, {0} }, // Unknown. NaN / ffffffff
 		{ 0x00, 0x30, BroanFieldType::Byte, {0} }, // Unknown. 0 / 00
 		{ 0x00, 0x22, BroanFieldType::Int, {0} }, // Unknown. 14400 / 40380000
-		{ 0x07, 0x50, BroanFieldType::Int, {0} }, // Unknown. Remote regularly sets this to -1
-		{ 0x03, 0x20, BroanFieldType::Byte, {0}, false }, // Unknown. Set to 0 when entering INT mode
-
-
-		{ 0x08, 0x30, BroanFieldType::Int, {0} }, // Unknown. Seems to change a lot. 0 / 3808569
+		{ 0x07, 0x50, BroanFieldType::Int, {0} }, // Unknown. VTSPEEDW often sets this to -1
+		{ 0x03, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering INT mode
+		{ 0x08, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering SMART mode, set to 1 in continuous modes.
+*/
 
 	};
 
@@ -160,23 +230,28 @@ public:
 private:
 
 	uint32_t m_nLastHadControl = 0;
-	uint32_t m_nNextQuery = 0;
+	uint32_t m_nNextQuery = 0; // Next time to mark polling fields dirty
 
 	bool m_bERVReady = false;
 
+#ifdef SCAN_UNKNOWN
 	// Field scanner
 	uint32_t m_nNextScan = 0;
 	uint8_t m_nFieldCursor = 0;
 	uint8_t m_nGroupCursor = 0x20;
 	std::map<uint16_t, BroanField_t> m_vecFieldData;
+#endif
 
 	std::vector<uint8_t> m_vecHeader;
 	bool m_bHaveHeader = false;
 
 	bool m_bHaveControl = false;
 	bool m_bExpectingReply = false;
+	bool m_bHaveSentMessage = false;
 
 	std::deque<std::vector<uint8_t>> m_vecSendQueue;
+
+	uint8_t m_nTemperatureId = -1;
 
 
 private:
@@ -196,6 +271,8 @@ private:
 	}
 
 	BroanField_t* lookupField( uint8_t opcodeHigh, uint8_t opcodeLow );
+	uint32_t lookupFieldIndex( uint8_t opcodeHigh, uint8_t opcodeLow );
+	void handleUnknownField(uint32_t nOpcodeHigh, uint32_t nOpcodeLow, uint8_t len, uint32_t i, const std::vector<uint8_t>& message );
 
 	void queueMessage(std::vector<uint8_t>& message);
 
@@ -205,7 +282,8 @@ protected:
 	std::string fan_mode_{};
 	float fan_speed_{0.f};
 	float power_{0.f};
-
+	float temperature_{0.f};
+	uint32_t filter_life_{0};
 
 };
 

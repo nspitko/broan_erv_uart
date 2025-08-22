@@ -24,7 +24,7 @@ void BroanComponent::setFanMode( std::string mode )
 	std::vector<BroanField_t> vecFields;
 	vecFields.push_back( m_vecFields[FanMode].copyForUpdate( value ) );
 
-	m_vecFields[FanMode].m_bStale = true;
+	m_vecFields[FanMode].m_unLastUpdate = millis() - m_vecFields[FanMode].m_unPollRate;
 
 	writeRegisters( vecFields );
 
@@ -33,15 +33,22 @@ void BroanComponent::setFanMode( std::string mode )
 void BroanComponent::setFanSpeed( float input )
 {
 	//return;
-	float value = remap( input, 0.f, 100.f, 32.f, 175.f );
+	float flMin = m_vecFields[CFMIn_Min].m_value.m_flValue;
+	float flMax = m_vecFields[CFMIn_Max].m_value.m_flValue;
+	if( flMin == 0 || flMax == 0 )
+	{
+		ESP_LOGE("broan","Failed to set fan speed: Invalid min/max state");
+		return;
+	}
+	float value = remap( input, 0.f, 100.f, flMin, flMax );
 
 	std::vector<BroanField_t> vecFields;
 
-	vecFields.push_back( m_vecFields[FanSpeed].copyForUpdate( value ) );
-	vecFields.push_back( m_vecFields[FanSpeedB].copyForUpdate( value ) );
+	vecFields.push_back( m_vecFields[CFMIn_Medium].copyForUpdate( value ) );
+	vecFields.push_back( m_vecFields[CFMOut_Medium].copyForUpdate( value ) );
 
-	m_vecFields[FanSpeed].m_bStale = true;
-	m_vecFields[FanSpeedB].m_bStale = true;
+	m_vecFields[CFMIn_Medium].m_unLastUpdate = millis() - m_vecFields[CFMIn_Medium].m_unPollRate;
+	m_vecFields[CFMOut_Medium].m_unLastUpdate = millis() - m_vecFields[CFMOut_Medium].m_unPollRate;
 
 	writeRegisters( vecFields );
 
@@ -80,7 +87,6 @@ void BroanComponent::setFanSpeedCFM( BroanFanMode mode, BroanCFMMode direction, 
 	}
 
 	writeRegisters( vecFields );
-
 }
 
 }  // namespace broan
