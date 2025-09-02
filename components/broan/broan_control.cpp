@@ -24,7 +24,7 @@ void BroanComponent::setFanMode( std::string mode )
 	std::vector<BroanField_t> vecFields;
 	vecFields.push_back( m_vecFields[FanMode].copyForUpdate( value ) );
 
-	m_vecFields[FanMode].m_unLastUpdate = millis() - m_vecFields[FanMode].m_unPollRate;
+	m_vecFields[FanMode].markDirty();
 
 	writeRegisters( vecFields );
 
@@ -47,8 +47,8 @@ void BroanComponent::setFanSpeed( float input )
 	vecFields.push_back( m_vecFields[CFMIn_Medium].copyForUpdate( value ) );
 	vecFields.push_back( m_vecFields[CFMOut_Medium].copyForUpdate( value ) );
 
-	m_vecFields[CFMIn_Medium].m_unLastUpdate = millis() - m_vecFields[CFMIn_Medium].m_unPollRate;
-	m_vecFields[CFMOut_Medium].m_unLastUpdate = millis() - m_vecFields[CFMOut_Medium].m_unPollRate;
+	m_vecFields[CFMIn_Medium].markDirty();
+	m_vecFields[CFMOut_Medium].markDirty();
 
 	writeRegisters( vecFields );
 
@@ -85,6 +85,22 @@ void BroanComponent::setFanSpeedCFM( BroanFanMode mode, BroanCFMMode direction, 
 			ESP_LOGW("broan","Unhandled: Setting fan speed limits for  mode %02X", mode );
 
 	}
+
+	writeRegisters( vecFields );
+}
+
+void BroanComponent::resetFilter()
+{
+	std::vector<BroanField_t> vecFields;
+
+	uint32_t unNewFilterLife = FILTER_LIFE_MAX;
+	uint8_t unFilterReset = 0;
+
+	vecFields.push_back( m_vecFields[FilterLife].copyForUpdate( unNewFilterLife ) );
+	vecFields.push_back( m_vecFields[FilterReset].copyForUpdate( unFilterReset ) );
+
+	m_vecFields[FilterReset].markDirty();
+	m_vecFields[FilterLife].markDirty();
 
 	writeRegisters( vecFields );
 }

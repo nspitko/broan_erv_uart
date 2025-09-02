@@ -7,6 +7,10 @@
 #include "esphome/components/select/select.h"
 #endif
 
+#ifdef USE_BUTTON
+#include "esphome/components/button/button.h"
+#endif
+
 #include "esphome/components/uart/uart.h"
 
 
@@ -15,6 +19,7 @@ namespace broan {
 
 #define CONTROL_TIMEOUT 5000
 #define UPDATE_RATE 1000
+#define HEARTBEAT_RATE 10000
 
 #define UPDATE_RATE_FAST 3000
 #define UPDATE_RATE_SLOW 60000
@@ -22,6 +27,8 @@ namespace broan {
 
 #define MAX_REQUEST_SIZE 10
 #define INVALID_FIELD 0xFFFFFF
+
+#define FILTER_LIFE_MAX 7884000
 
 //#define SCAN_UNKNOWN 1
 //#define LISTEN_ONLY 1
@@ -127,6 +134,11 @@ struct BroanField_t
 		return copy;
 	}
 
+	void markDirty()
+	{
+		m_unLastUpdate = millis() - m_unPollRate;
+	}
+
 };
 
 class BroanComponent : public Component, public uart::UARTDevice
@@ -144,6 +156,10 @@ class BroanComponent : public Component, public uart::UARTDevice
 
 #ifdef USE_NUMBER
 	SUB_NUMBER(fan_speed)
+#endif
+
+#ifdef USE_BUTTON
+  SUB_BUTTON(filter_reset)
 #endif
 
 public:
@@ -184,7 +200,7 @@ public:
 		{ 0x05, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_NEVER }, // Controller temperature (Write only)
 
 		// Maintenance
-		{ 0x09, 0x30, BroanFieldType::Byte, {0}, UPDATE_RATE_SLOW }, // Set to 0x01 to reset filter
+		{ 0x01, 0x30, BroanFieldType::Byte, {0}, UPDATE_RATE_SLOW }, // Set to 0x01 to reset filter
 		{ 0x08, 0x30, BroanFieldType::Int, {0}, UPDATE_RATE_SLOW }, // Number of seconds until filter needs reset. Set along side reset byte
 
 
@@ -226,13 +242,15 @@ public:
 	void setFanMode( std::string mode );
 	void setFanSpeed( float speed );
 	void setFanSpeedCFM( BroanFanMode mode, BroanCFMMode direction, float flTargetCFM );
+	void resetFilter();
 
 private:
 
 	uint32_t m_nLastHadControl = 0;
-	uint32_t m_nNextQuery = 0; // Next time to mark polling fields dirty
+	uint32_t m_unLastHeartbeat = 0; // Next time to send heartbeat
 
 	bool m_bERVReady = false;
+
 
 #ifdef SCAN_UNKNOWN
 	// Field scanner

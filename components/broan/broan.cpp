@@ -137,6 +137,27 @@ bool BroanComponent::readMessage()
 	return true;
 }
 
+void esp_log_vector_hex(const char* tag, const std::vector<uint8_t>& message) {
+    if (message.empty()) {
+        ESP_LOGW(tag, "Message vector is empty");
+        return;
+    }
+    std::string hex_string;
+    for (size_t i = 0; i < message.size(); ++i) {
+        char buf[4];
+        snprintf(buf, sizeof(buf), "%02X ", message[i]);
+        hex_string += buf;
+        // Optional: newline every 16 bytes for readability
+        if ((i + 1) % 16 == 0) {
+            ESP_LOGW(tag, "%s", hex_string.c_str());
+            hex_string.clear();
+        }
+    }
+    if (!hex_string.empty()) {
+        ESP_LOGW(tag, "%s", hex_string.c_str());
+    }
+}
+
 void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::vector<uint8_t>& message)
 {
 	if( target == m_nServerAddress )
@@ -175,6 +196,7 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 
 			// Ack that we have control. We'll send any queued messages then release with 0x04
 			send({ 0x05 });
+			//ESP_LOGD("broan","Got flow control");
 			break;
 		}
 		case 0x05:
@@ -192,9 +214,11 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 					ESP_LOGW("broan", "Got write response for unknown field %02X %02X", message[i], message[i+1]);
 					continue;
 				}
-				pField->m_unLastUpdate = millis() - pField->m_unPollRate;
+				pField->markDirty();
 			}
 			m_bExpectingReply = false;
+
+
 			break;
 		}
 		case 0x21:
@@ -213,7 +237,7 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 		{
 			// Log unhandled m_nType
 			ESP_LOGW("broan", "Unhandled m_nType %02X", m_nType);
-			ESP_LOG_BUFFER_HEX_LEVEL("broan", message.data(), message.size(), ESP_LOG_WARN);
+			esp_log_vector_hex("broan", message );
 			break;
 		}
 	}
@@ -500,6 +524,19 @@ void BroanComponent::runTasks()
 		{
 			queueMessage(vecRequest);
 		}
+	}
+
+
+	if( time - m_unLastHeartbeat > HEARTBEAT_RATE )
+	{
+		m_unLastHeartbeat = time;
+		std::vector<unsigned char> vecRequest;
+		vecRequest.push_back(0x40);
+		vecRequest.push_back(0x00);
+		vecRequest.push_back(0x50);
+		vecRequest.push_back(0x00);
+
+		queueMessage(vecRequest);
 	}
 
 #ifdef SCAN_UNKNOWN
