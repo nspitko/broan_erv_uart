@@ -85,6 +85,10 @@ sensor:
     filter_life:
       name: Remaining Filter life
 
+    # Not all ERVs have this sensor, remove if you don't get readings from it.
+    temperature_out:
+      name: Temperature Out
+
 button:
   - platform: broan
     filter_reset:

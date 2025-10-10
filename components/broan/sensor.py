@@ -16,6 +16,7 @@ from esphome.const import (
 )
 
 CONF_FILTER_LIFE = "filter_life"
+CONF_TEMPERATURE_OUT = "temperature_out"
 
 from . import CONF_BROAN_ID, BroanComponent
 
@@ -30,6 +31,11 @@ CONFIG_SCHEMA = cv.Schema(
             unit_of_measurement=UNIT_WATT,
         ),
         cv.Optional(CONF_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            icon=ICON_THERMOMETER,
+            unit_of_measurement=UNIT_CELSIUS,
+        ),
+        cv.Optional(CONF_TEMPERATURE_OUT): sensor.sensor_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             icon=ICON_THERMOMETER,
             unit_of_measurement=UNIT_CELSIUS,
@@ -51,6 +57,9 @@ async def to_code(config):
         sens = await sensor.new_sensor(temperature_config)
         cg.add(broan_component.set_temperature_sensor(sens))
 
+    if temperature_out_config := config.get(CONF_TEMPERATURE_OUT):
+        sens = await sensor.new_sensor(temperature_out_config)
+        cg.add(broan_component.set_temperature_out_sensor(sens))
 
     if filter_life_config := config.get(CONF_FILTER_LIFE):
         sens = await sensor.new_sensor(filter_life_config)

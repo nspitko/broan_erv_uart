@@ -78,8 +78,8 @@ enum BroanField
 	// Info
 	Uptime, // In seconds?
 	Wattage,
-	TemperatureA,
-	TemperatureB,
+	TemperatureIn,
+	TemperatureOut,
 
 	// Speeds
 	CFMIn_Medium,
@@ -147,6 +147,7 @@ class BroanComponent : public Component, public uart::UARTDevice
 #ifdef USE_SENSOR
 	SUB_SENSOR(power)
 	SUB_SENSOR(temperature)
+	SUB_SENSOR(temperature_out)
 	SUB_SENSOR(filter_life)
 #endif
 
@@ -183,8 +184,8 @@ public:
 		// Info
 		{ 0x14, 0x00, BroanFieldType::Int, {0}, UPDATE_RATE_SLOW }, // Uptime (Seconds)
 		{ 0x23, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Power draw (Watts)
-		{ 0x01, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (B150E75NT)
-		{ 0x03, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (BLP150E75NS)
+		{ 0x01, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (In)
+		{ 0x03, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (Out)
 
 		// Speeds
 		{ 0x06, 0x22, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // MED target CFM in.
@@ -269,8 +270,6 @@ private:
 
 	std::deque<std::vector<uint8_t>> m_vecSendQueue;
 
-	uint8_t m_nTemperatureId = -1;
-
 
 private:
 	// Internal
@@ -301,6 +300,7 @@ protected:
 	float fan_speed_{0.f};
 	float power_{0.f};
 	float temperature_{0.f};
+	float temperature_out_{0.f};
 	uint32_t filter_life_{0};
 
 };

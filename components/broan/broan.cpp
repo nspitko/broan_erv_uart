@@ -358,22 +358,16 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				filter_life_sensor_->publish_state( pField->m_value.m_nValue );
 			break;
 
-			case BroanField::TemperatureA:
-			case BroanField::TemperatureB:
+			case BroanField::TemperatureIn:
+				temperature_sensor_->publish_state(pField->m_value.m_flValue);
+				break;
+			case BroanField::TemperatureOut:
 			{
 				// @todo: We should stop querying NaN fields...
 				if( std::isnan( pField->m_value.m_flValue ) )
 					break;
 
-				if( m_nTemperatureId == 0xFF )
-					m_nTemperatureId = pField->m_nOpcodeHigh;
-
-				if( m_nTemperatureId != pField->m_nOpcodeHigh )
-				{
-					ESP_LOGW("broan","Got report on two different temperature sensors... this needs a code fix! (saw %02X and %02X)", pField->m_nOpcodeHigh, m_nTemperatureId);
-					break;
-				}
-				temperature_sensor_->publish_state(pField->m_value.m_flValue);
+				temperature_out_sensor_->publish_state(pField->m_value.m_flValue);
 			}
 			break;
 		}
