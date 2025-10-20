@@ -56,6 +56,7 @@ enum BroanCFMMode
 enum BroanFanMode
 {
 	Off = 0x01,
+	Ovr = 0x02,
 	Intermittent = 0x08,
 	Min = 0x09,
 	Max = 0x0a,

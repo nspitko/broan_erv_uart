@@ -327,6 +327,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				std::string strMode;
 				switch( pField->m_value.m_chValue )
 				{
+					case 0x02: strMode = "ovr"; break;
 					case 0x08: strMode = "int"; break;
 					case 0x09: strMode = "min"; break;
 					case 0x0a: strMode = "max"; break;
