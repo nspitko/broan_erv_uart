@@ -35,6 +35,7 @@ async def to_code(config):
                 "int",
                 "manual",
                 "turbo",
+				"ovr",
             ],
         )
         await cg.register_parented(s, config[CONF_BROAN_ID])

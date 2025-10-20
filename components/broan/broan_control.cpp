@@ -17,6 +17,8 @@ void BroanComponent::setFanMode( std::string mode )
 		value = 0x08;
 	else if( mode == "turbo" )
 		value = 0x0c;
+	else if( mode == "ovr" )
+		value = 0x02;
 	else
 		value = 0x01;
 
