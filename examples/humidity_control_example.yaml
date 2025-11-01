@@ -1,0 +1,71 @@
+external_components:
+  - source:
+      type: git
+      url: https://github.com/nspitko/broan_erv_uart
+      ref: main
+    components: [ broan ]
+
+uart:
+  id: rs485
+  tx_pin: GPIO17 # Change these to match your rs485 tranceiver. 17/18 is txd1/rxd1
+  rx_pin: GPIO18
+  baud_rate: 38400
+  rx_buffer_size: 2048
+#  debug:
+#    direction: BOTH
+#    dummy_receiver: false
+#    sequence:
+#      - lambda: UARTDebug::log_hex(direction, bytes, ' ');
+
+broan:
+  uart_id: rs485
+  id: mybroan
+
+select:
+  - platform: broan
+    fan_mode:
+      name: "Fan Mode"
+
+number:
+  - platform: broan
+    fan_speed:
+      name: "Fan Speed"
+    humidity_setpoint:          # set the desired humidity level
+      name: "Humidity Setpoint"
+
+switch:
+  - platform: broan
+    humidity_control:           # turn on/off the humidity control mode
+      name: "Humidity Control"
+      id: humcontrol
+      on_turn_on:               # if we're turning it on, send the current humidity right now
+        then:
+          lambda: id(mybroan).setCurrentHumidity(id(myhumidity).state);
+
+sensor:
+  - platform: broan
+    power:
+      name: Power Draw
+    temperature:
+      name: Temperature
+    temperature_out:
+      name: Temperature2
+    filter_life:
+      name: Remaining Filter life
+  - platform: homeassistant      # retrieve humidity from a sensor in HomeAssistant
+    id: myhumidity
+    name: "Home Assistant Humidity"
+    internal: true
+    entity_id: sensor.main_thermostat_current_humidity
+    on_value:                    # when we get an update, send to the ERV 
+      then:                      # if humidty control mode is on
+        lambda: |-
+          if (id(humcontrol).state) {
+            id(mybroan).setCurrentHumidity(id(myhumidity).state);
+          }
+button:
+  - platform: broan
+    filter_reset:
+      name: Filter Reset
+
+
