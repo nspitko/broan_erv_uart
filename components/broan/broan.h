@@ -11,6 +11,10 @@
 #include "esphome/components/button/button.h"
 #endif
 
+#ifdef USE_SWITCH
+#include "esphome/components/switch/switch.h"
+#endif
+
 #include "esphome/components/uart/uart.h"
 
 
@@ -63,6 +67,7 @@ enum BroanFanMode
 	Smart = 0x11,
 	Manual = 0x0b,
 	Turbo = 0x0c,
+	Humidity = 0x0d,
 	Away = 0x0F, // "OTH", no idea what this actually does?
 
 };
@@ -73,8 +78,8 @@ enum BroanField
 	FanMode = 0,
 	HumidityControl,
 	IntModeDuration,
-	CurrentHumidityA, // Set both to same value per VTSPEEDW
-	CurrentHumidityB,
+	TargetHumidityA, // Set both to same value per VTSPEEDW
+	TargetHumidityB,
 
 	// Info
 	Uptime, // In seconds?
@@ -158,10 +163,15 @@ class BroanComponent : public Component, public uart::UARTDevice
 
 #ifdef USE_NUMBER
 	SUB_NUMBER(fan_speed)
+	SUB_NUMBER(humidity_setpoint)
 #endif
 
 #ifdef USE_BUTTON
   SUB_BUTTON(filter_reset)
+#endif
+
+#ifdef USE_SWITCH
+  SUB_SWITCH(humidity_control)
 #endif
 
 public:
@@ -245,6 +255,9 @@ public:
 	void setFanSpeed( float speed );
 	void setFanSpeedCFM( BroanFanMode mode, BroanCFMMode direction, float flTargetCFM );
 	void resetFilter();
+	void setHumidityControl( bool enable );
+	void setHumiditySetpoint( float humidity );
+	void setCurrentHumidity( float humidity );
 
 private:
 
