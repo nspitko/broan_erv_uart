@@ -35,6 +35,7 @@ async def to_code(config):
                 "int",
                 "manual",
                 "turbo",
+                "humidity",
 				"ovr",
             ],
         )

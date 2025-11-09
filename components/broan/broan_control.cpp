@@ -17,6 +17,8 @@ void BroanComponent::setFanMode( std::string mode )
 		value = 0x08;
 	else if( mode == "turbo" )
 		value = 0x0c;
+	else if( mode == "humidity" )
+		value = 0x0d;
 	else if( mode == "ovr" )
 		value = 0x02;
 	else
@@ -106,6 +108,46 @@ void BroanComponent::resetFilter()
 
 	writeRegisters( vecFields );
 }
+
+void BroanComponent::setHumidityControl( bool enable ) {
+	std::vector<BroanField_t> vecFields;
+
+	uint8_t value = 0;
+
+	if (enable) {
+		value = 0x01;
+	}
+
+	vecFields.push_back( m_vecFields[HumidityControl].copyForUpdate( value ) );
+
+	m_vecFields[HumidityControl].markDirty();
+
+	writeRegisters( vecFields );
+}
+
+void BroanComponent::setHumiditySetpoint( float humidity ) {
+	std::vector<BroanField_t> vecFields;
+
+	vecFields.push_back( m_vecFields[TargetHumidityA].copyForUpdate( humidity ) );
+	vecFields.push_back( m_vecFields[TargetHumidityB].copyForUpdate( humidity ) );
+
+	m_vecFields[TargetHumidityA].markDirty();
+	m_vecFields[TargetHumidityB].markDirty();
+
+	writeRegisters( vecFields );
+}
+
+void BroanComponent::setCurrentHumidity( float humidity ) {
+	std::vector<BroanField_t> vecFields;
+  
+	ESP_LOGI("broan_control", "Set current humidity: %0.1f%%", humidity);
+
+	vecFields.push_back( m_vecFields[ControllerHumidity].copyForUpdate( humidity ) );
+	m_vecFields[ControllerHumidity].markDirty();
+
+	writeRegisters( vecFields );
+}
+
 
 }  // namespace broan
 }  // namespace esphome

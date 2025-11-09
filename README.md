@@ -21,12 +21,18 @@ Some rs485 trancevers have a jumper for the terminating resistor, some do not. I
 Also be aware some RS485 devices will label their pins A and B instead of D+ and D-. Somewhat confusingly, A is D- and B is D+
 
 ## Supported features
-* Setting fan mode (Standby, Min, Max, Intermittent, Turbo, and Med, which is treated as manual control)
+* Setting fan mode (Standby, Min, Max, Intermittent, Turbo, Override, and Med, which is treated as manual control)
 * Setting fan speed in manual mode
+* Humidity control mode
 * Intake temperature
 * Filter life left
 
 More features will be added as time allows. I've documented many fields that aren't supported yet. If there's a specific feature you want prioritized, open an issue. This project is at a point where it "works for me" so I don't have a lot of guiding light on what else should be added without external input.
+
+## Humidity Control Mode
+In Humidity Control Mode, the controller sets a target humidity level and the ERV automatically runs if the humidity is above this level. The ERV does not have a humidity sensor - the current humidity reading is sent periodically from the controller.  Since we are replacing the original controller, we need to send current humidity readings from the ESP device. This can be done from a lambda in your ESPHome config calling the setCurrentHumidity() function.  For an example configuration, see the [humidity_control_sample.yaml](./examples/humidity_control_example.yaml) configuration in the [examples](./examples/) directory.
+
+To use humidity control mode once it is enabled, set the desired humidity with "Humidity Setpoint", and then turn on the Humidity Control switch.
 
 ## FAQ
 Q: I see errors about failed communication
@@ -39,7 +45,7 @@ A: Not everything is actually exposed via the rs485 interface, like the life CFM
 
 Q: What if I still want wall controls?
 
-A: You can use the aux remotes, those use the dry contact interface which is a hard override. This is how Broan bypasses the protocol limitation. If you don't want to control anything, it's possible to snoop the interface to read sensor values, I use this mode for debugging but it's not exposed as a feature yet since it doesn't seem useful to me Feel free to make a case for it.
+A: You can use the aux remotes, those use the dry contact interface which is a hard override. The fan mode will indicate "ovr" (override) when these controls are used. This is how Broan bypasses the protocol limitation. If you don't want to control anything, it's possible to snoop the interface to read sensor values, I use this mode for debugging but it's not exposed as a feature yet since it doesn't seem useful to me Feel free to make a case for it.
 
 ### ESPhome yaml
 Add this to an existing config.

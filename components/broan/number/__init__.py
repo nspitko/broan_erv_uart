@@ -3,9 +3,11 @@ from esphome.components import number
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ID,
-    DEVICE_CLASS_SPEED ,
+    DEVICE_CLASS_SPEED,
+    DEVICE_CLASS_HUMIDITY,
     ENTITY_CATEGORY_CONFIG,
-    ICON_FAN ,
+    ICON_FAN,
+    ICON_WATER,
     UNIT_PERCENT,
 )
 
@@ -14,8 +16,10 @@ UNIT_CFM = "CFM"
 from .. import CONF_BROAN_ID, BroanComponent, broan_ns
 
 FanSpeedNumber = broan_ns.class_("FanSpeedNumber", number.Number)
+HumiditySetpointNumber = broan_ns.class_("HumiditySetpointNumber", number.Number)
 
 CONF_FAN_SPEED = "fan_speed"
+CONF_HUMIDITY_SETPOINT = "humidity_setpoint"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -27,6 +31,13 @@ CONFIG_SCHEMA = cv.Schema(
 			unit_of_measurement=UNIT_PERCENT,
             icon=ICON_FAN,
         ),
+        cv.Optional(CONF_HUMIDITY_SETPOINT): number.number_schema(
+            HumiditySetpointNumber,
+            device_class=DEVICE_CLASS_HUMIDITY,
+            entity_category=ENTITY_CATEGORY_CONFIG,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_WATER,
+        )
     }
 )
 
@@ -40,3 +51,10 @@ async def to_code(config):
         )
         await cg.register_parented(n, config[CONF_BROAN_ID])
         cg.add(broan_component.set_fan_speed_number(n))
+
+    if humidity_setpoint_config := config.get(CONF_HUMIDITY_SETPOINT):
+        h = await number.new_number(
+            humidity_setpoint_config, min_value=30, max_value=55, step=5
+        )
+        await cg.register_parented(h, config[CONF_BROAN_ID])
+        cg.add(broan_component.set_humidity_setpoint_number(h))

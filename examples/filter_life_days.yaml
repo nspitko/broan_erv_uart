@@ -1,0 +1,8 @@
+# replace the old filter_life section with the following to report 
+# filter life to HomeAssistant in days rather than seconds
+
+    filter_life:
+      name: Remaining Filter Life
+      unit_of_measurement: "d"
+      filters:
+        - lambda: return x / 86400.0;
