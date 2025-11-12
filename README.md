@@ -26,6 +26,7 @@ Also be aware some RS485 devices will label their pins A and B instead of D+ and
 * Humidity control mode
 * Intake temperature
 * Filter life left
+* Fan CFM 
 
 More features will be added as time allows. I've documented many fields that aren't supported yet. If there's a specific feature you want prioritized, open an issue. This project is at a point where it "works for me" so I don't have a lot of guiding light on what else should be added without external input.
 
@@ -37,11 +38,11 @@ To use humidity control mode once it is enabled, set the desired humidity with "
 ## FAQ
 Q: I see errors about failed communication
 
-A: Either you have the RS495 wires reversed, or you didn't restart the ERV after connecting the ESP32.
+A: Either you have the RS485 wires reversed, or you didn't restart the ERV after connecting the ESP32.
 
 Q: Why doesn't it support X?
 
-A: Not everything is actually exposed via the rs485 interface, like the life CFM readings much to my chagrin. For other stuff, I may need dumps from a unit with the feature you're requesting, or it might already be mapped and just needs to be plumbed though to Home Assistant. Feel free to open an issue or PR
+A: Not everything is actually exposed via the rs485 interface. I may need dumps from a unit with the feature you're requesting, or it might already be mapped and just needs to be plumbed though to Home Assistant. Feel free to open an issue or PR
 
 Q: What if I still want wall controls?
 

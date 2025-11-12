@@ -316,7 +316,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 		uint32_t oldVal = pField->m_value.m_nValue;
 		for (size_t b = 0; b < len; ++b)
 			pField->m_value.m_rgBytes[b] = static_cast<char>(message[nDataPos+b]);
-
+	
 		if( oldVal == pField->m_value.m_nValue )
 			continue;
 
@@ -325,6 +325,9 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 #ifdef USE_SELECT
 			case BroanField::FanMode:
 			{
+				if( !fan_mode_select_ )
+					continue;
+
 				std::string strMode;
 				switch( pField->m_value.m_chValue )
 				{
@@ -345,30 +348,43 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 #endif
 #ifdef USE_SENSOR
 			case BroanField::Wattage:
+				if( !power_sensor_ )
+					continue;
+
 				power_sensor_->publish_state(pField->m_value.m_flValue);
 			break;
 
 			case BroanField::FilterLife:
+				if( !filter_life_sensor_ )
+					continue;
 				filter_life_sensor_->publish_state(pField->m_value.m_nValue);
 			break;
 
 			case BroanField::TemperatureIn:
+				if( !temperature_sensor_ )
+					continue;
+
 				temperature_sensor_->publish_state(pField->m_value.m_flValue);
 				break;
 
 			case BroanField::SupplyCFM:
+				if( !supply_cfm_sensor_ )
+					continue;
 				supply_cfm_sensor_->publish_state(pField->m_value.m_flValue);
 			break;
 
 			case BroanField::ExhaustCFM:
+				if( !exhaust_cfm_sensor_ )
+					continue;
+
 				exhaust_cfm_sensor_->publish_state(pField->m_value.m_flValue);
 				break;
 				
 			case BroanField::TemperatureOut:
 			{
 				// @todo: We should stop querying NaN fields...
-				if( std::isnan( pField->m_value.m_flValue ) )
-					break;
+				if( !temperature_out_sensor_ || std::isnan( pField->m_value.m_flValue ) )
+					continue;
 
 				temperature_out_sensor_->publish_state(pField->m_value.m_flValue);		
 			}
@@ -377,12 +393,17 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 #endif	
 #ifdef USE_NUMBER
 			case BroanField::TargetHumidityA:
+				if( !humidity_setpoint_number_ )
+					continue;
 				humidity_setpoint_number_->publish_state(pField->m_value.m_flValue);
 			break;
 
 			// @todo: We don't support unbalanced values here currently....
 			case BroanField::CFMIn_Medium:
 			{
+				if( !fan_speed_number_ )
+					continue;
+
 				float flMin = m_vecFields[CFMIn_Min].m_value.m_flValue;
 				float flMax = m_vecFields[CFMIn_Max].m_value.m_flValue;
 				float flAdjusted = remap( pField->m_value.m_flValue, flMin, flMax, 0.f, 100.f );
@@ -392,6 +413,9 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 #endif
 #ifdef USE_SWITCH
 			case BroanField::HumidityControl:
+				if( !humidity_control_switch_ )
+						continue;
+				
 				humidity_control_switch_->publish_state(pField->m_value.m_chValue==1);
 			break;
 	#endif
@@ -400,7 +424,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 		switch( pField->m_nType )
 		{
 			case BroanFieldType::Byte:
-				ESP_LOGD("broan","%02X%02X is now Byte  %02X", nOpcodeHigh, nOpcodeLow, pField->m_value.m_chValue );
+				ESP_LOGD("broan","%02X%02X is now Byte %02X", nOpcodeHigh, nOpcodeLow, pField->m_value.m_chValue );
 				break;
 			case BroanFieldType::Int:
 				ESP_LOGD("broan","%02X%02X is now Int %i", nOpcodeHigh, nOpcodeLow, pField->m_value.m_nValue );
@@ -409,6 +433,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				ESP_LOGD("broan","%02X%02X is now Float %f", nOpcodeHigh, nOpcodeLow, pField->m_value.m_flValue );
 				break;
 			case BroanFieldType::Void:
+				ESP_LOGD("broan","%02X%02X is not set", nOpcodeHigh, nOpcodeLow );
 				break;
 		}
     }

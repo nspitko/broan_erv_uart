@@ -223,8 +223,8 @@ public:
 
 
 		// Interesting fields found by scan
-		{ 0x08, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // Unknown. Seems to change a lot. 38.943115 / 1109116352 (Does not correlate with fan speed)
-		{ 0x09, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_SLOW }, // Unknown. Seems to change a lot. 36.360962 / 1108439456 (Same as above)
+		{ 0x08, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_NEVER }, // Unknown. Seems to change a lot. 38.943115 / 1109116352 (Does not correlate with fan speed)
+		{ 0x09, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_NEVER }, // Unknown. Seems to change a lot. 36.360962 / 1108439456 (Same as above)
 
 /*
 		// Unknown fields scanned by the VTSPEEDW
