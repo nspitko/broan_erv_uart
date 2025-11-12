@@ -10,6 +10,7 @@ from esphome.const import (
     ICON_POWER,
     ICON_THERMOMETER,
     ICON_AIR_FILTER,
+    ICON_FAN,
     UNIT_WATT,
     UNIT_CELSIUS,
     UNIT_SECOND,
@@ -17,6 +18,10 @@ from esphome.const import (
 
 CONF_FILTER_LIFE = "filter_life"
 CONF_TEMPERATURE_OUT = "temperature_out"
+CONF_SUPPLY_CFM = "supply_fan_cfm"
+CONF_EXHAUST_CFM = "exhaust_fan_cfm"
+
+UNIT_CFM = "CFM"
 
 from . import CONF_BROAN_ID, BroanComponent
 
@@ -44,6 +49,14 @@ CONFIG_SCHEMA = cv.Schema(
             icon=ICON_AIR_FILTER,
             unit_of_measurement=UNIT_SECOND,
         ),
+        cv.Optional(CONF_SUPPLY_CFM): sensor.sensor_schema(
+            icon=ICON_FAN,
+            unit_of_measurement=UNIT_CFM,
+        ),
+        cv.Optional(CONF_EXHAUST_CFM): sensor.sensor_schema(
+            icon=ICON_FAN,
+            unit_of_measurement=UNIT_CFM,
+        ),
     }
 )
 
@@ -64,3 +77,11 @@ async def to_code(config):
     if filter_life_config := config.get(CONF_FILTER_LIFE):
         sens = await sensor.new_sensor(filter_life_config)
         cg.add(broan_component.set_filter_life_sensor(sens))
+
+    if supply_cfm_config := config.get(CONF_SUPPLY_CFM):
+        sens = await sensor.new_sensor(supply_cfm_config)
+        cg.add(broan_component.set_supply_cfm_sensor(sens))
+
+    if exhaust_cfm_config := config.get(CONF_EXHAUST_CFM):
+        sens = await sensor.new_sensor(exhaust_cfm_config)
+        cg.add(broan_component.set_exhaust_cfm_sensor(sens))

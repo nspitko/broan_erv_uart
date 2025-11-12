@@ -90,6 +90,10 @@ sensor:
       name: Temperature
     filter_life:
       name: Remaining Filter life
+    supply_fan_cfm:
+      name: "Supply fan CFM"
+    exhaust_fan_cfm:
+      name: "Exhaust fan CFM"
 
     # Not all ERVs have this sensor, remove if you don't get readings from it.
     temperature_out:

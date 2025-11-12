@@ -86,6 +86,8 @@ enum BroanField
 	Wattage,
 	TemperatureIn,
 	TemperatureOut,
+	SupplyCFM,
+	ExhaustCFM,
 
 	// Speeds
 	CFMIn_Medium,
@@ -155,6 +157,8 @@ class BroanComponent : public Component, public uart::UARTDevice
 	SUB_SENSOR(temperature)
 	SUB_SENSOR(temperature_out)
 	SUB_SENSOR(filter_life)
+	SUB_SENSOR(supply_cfm)
+	SUB_SENSOR(exhaust_cfm)
 #endif
 
 #ifdef USE_SELECT
@@ -197,6 +201,8 @@ public:
 		{ 0x23, 0x50, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Power draw (Watts)
 		{ 0x01, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (In)
 		{ 0x03, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (Out)
+		{ 0x05, 0x10, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Intake CFM
+		{ 0x06, 0x10, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Exhaust CFM
 
 		// Speeds
 		{ 0x06, 0x22, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // MED target CFM in.
@@ -315,6 +321,8 @@ protected:
 	float power_{0.f};
 	float temperature_{0.f};
 	float temperature_out_{0.f};
+	float supply_cfm_{0.f};
+	float exhaust_cf,_{0.f};
 	uint32_t filter_life_{0};
 
 };

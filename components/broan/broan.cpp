@@ -322,6 +322,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 
 		switch(unField)
 		{
+#ifdef USE_SELECT
 			case BroanField::FanMode:
 			{
 				std::string strMode;
@@ -341,6 +342,43 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				fan_mode_select_->publish_state( strMode );
 			}
 			break;
+#endif
+#ifdef USE_SENSOR
+			case BroanField::Wattage:
+				power_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+
+			case BroanField::FilterLife:
+				filter_life_sensor_->publish_state(pField->m_value.m_nValue);
+			break;
+
+			case BroanField::TemperatureIn:
+				temperature_sensor_->publish_state(pField->m_value.m_flValue);
+				break;
+
+			case BroanField::SupplyCFM:
+				supply_cfm_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+
+			case BroanField::ExhaustCFM:
+				exhaust_cfm_sensor_->publish_state(pField->m_value.m_flValue);
+				break;
+				
+			case BroanField::TemperatureOut:
+			{
+				// @todo: We should stop querying NaN fields...
+				if( std::isnan( pField->m_value.m_flValue ) )
+					break;
+
+				temperature_out_sensor_->publish_state(pField->m_value.m_flValue);		
+			}
+			break;
+
+#endif	
+#ifdef USE_NUMBER
+			case BroanField::TargetHumidityA:
+				humidity_setpoint_number_->publish_state(pField->m_value.m_flValue);
+			break;
 
 			// @todo: We don't support unbalanced values here currently....
 			case BroanField::CFMIn_Medium:
@@ -351,33 +389,12 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				fan_speed_number_->publish_state(flAdjusted);
 			}
 			break;
-
-			case BroanField::Wattage:
-				power_sensor_->publish_state(pField->m_value.m_flValue);
-			break;
-
-			case BroanField::FilterLife:
-				filter_life_sensor_->publish_state( pField->m_value.m_nValue );
-			break;
-
-			case BroanField::TemperatureIn:
-				temperature_sensor_->publish_state(pField->m_value.m_flValue);
-				break;
-			case BroanField::TemperatureOut:
-			{
-				// @todo: We should stop querying NaN fields...
-				if( std::isnan( pField->m_value.m_flValue ) )
-					break;
-
-				temperature_out_sensor_->publish_state(pField->m_value.m_flValue);
-			}
-			break;
-			case BroanField::TargetHumidityA:
-			  humidity_setpoint_number_->publish_state(pField->m_value.m_flValue);
-				break;
+#endif
+#ifdef USE_SWITCH
 			case BroanField::HumidityControl:
-			  humidity_control_switch_->publish_state(pField->m_value.m_chValue==1);
-				break;
+				humidity_control_switch_->publish_state(pField->m_value.m_chValue==1);
+			break;
+	#endif
 		}
 
 		switch( pField->m_nType )
