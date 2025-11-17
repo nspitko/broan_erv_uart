@@ -80,28 +80,53 @@ select:
 
 number:
   - platform: broan
+
+    # Speed as a ratio of min vs max speed. Eg, if your MIN is 20 CFM and your MAX is 
+    # 40 CFM, 50% means medium rill be at 30 CFM
     fan_speed:
       name: "fan speed"
 
+    # How many seconds ON per hour in int mode (eg, a value of 20 means the ERV will run
+    # 20 minutes on 40 minutes off every hour )
+    intermittent_period:
+      name: "Intermittent Period"
+
 sensor:
   - platform: broan
+    # As reported by the ERV, in watts
     power:
       name: Power draw
+
+    # Intake air temperature. This will generally read high
     temperature:
       name: Temperature
+
+    # In seconds. This may change to days later
     filter_life:
       name: Remaining Filter life
+
+    # CFM values as reported by the ERV
     supply_fan_cfm:
       name: "Supply fan CFM"
     exhaust_fan_cfm:
       name: "Exhaust fan CFM"
 
-    # Not all ERVs have this sensor, remove if you don't get readings from it.
+    # Fan motor RPM values
+    supply_fan_rpm:
+      name: "Supply fan RPM"
+    exhaust_fan_rpm:
+      name: "Exhaust fan RPM"
+
+    # Not all ERVs have these sensor, remove if you don't get readings from it.
+
+    # Exhaust air temperature.
     temperature_out:
       name: Temperature Out
 
 button:
   - platform: broan
+
+    # Resets filter life to 7884000 seconds / 3 months (Default behavior)
     filter_reset:
       name: Filter reset
 

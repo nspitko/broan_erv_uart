@@ -365,11 +365,12 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 					continue;
 
 				temperature_sensor_->publish_state(pField->m_value.m_flValue);
-				break;
+			break;
 
 			case BroanField::SupplyCFM:
 				if( !supply_cfm_sensor_ )
 					continue;
+
 				supply_cfm_sensor_->publish_state(pField->m_value.m_flValue);
 			break;
 
@@ -378,7 +379,21 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 					continue;
 
 				exhaust_cfm_sensor_->publish_state(pField->m_value.m_flValue);
-				break;
+			break;
+
+			case BroanField::SupplyRPM:
+				if( !supply_rpm_sensor_ )
+					continue;
+
+				supply_rpm_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+
+			case BroanField::ExhaustRPM:
+				if( !exhaust_rpm_sensor_ )
+					continue;
+
+				exhaust_rpm_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
 				
 			case BroanField::TemperatureOut:
 			{
@@ -409,6 +424,12 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				float flAdjusted = remap( pField->m_value.m_flValue, flMin, flMax, 0.f, 100.f );
 				fan_speed_number_->publish_state(flAdjusted);
 			}
+			break;
+
+			case BroanField::IntModeDuration:
+				if( !intermittent_period_number_ )
+					continue;
+				intermittent_period_number_->publish_state(pField->m_value.m_nValue);
 			break;
 #endif
 #ifdef USE_SWITCH

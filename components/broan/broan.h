@@ -25,8 +25,8 @@ namespace broan {
 #define UPDATE_RATE 1000
 #define HEARTBEAT_RATE 10000
 
-#define UPDATE_RATE_FAST 3000
-#define UPDATE_RATE_SLOW 60000
+#define UPDATE_RATE_FAST 10000 // 10 seconds
+#define UPDATE_RATE_SLOW 60000 // 1 minute
 #define UPDATE_RATE_NEVER 0xFFFFFFFF
 
 #define MAX_REQUEST_SIZE 10
@@ -88,6 +88,8 @@ enum BroanField
 	TemperatureOut,
 	SupplyCFM,
 	ExhaustCFM,
+	SupplyRPM,
+	ExhaustRPM,
 
 	// Speeds
 	CFMIn_Medium,
@@ -159,6 +161,8 @@ class BroanComponent : public Component, public uart::UARTDevice
 	SUB_SENSOR(filter_life)
 	SUB_SENSOR(supply_cfm)
 	SUB_SENSOR(exhaust_cfm)
+	SUB_SENSOR(supply_rpm)
+	SUB_SENSOR(exhaust_rpm)
 #endif
 
 #ifdef USE_SELECT
@@ -168,6 +172,7 @@ class BroanComponent : public Component, public uart::UARTDevice
 #ifdef USE_NUMBER
 	SUB_NUMBER(fan_speed)
 	SUB_NUMBER(humidity_setpoint)
+	SUB_NUMBER(intermittent_period)
 #endif
 
 #ifdef USE_BUTTON
@@ -203,6 +208,8 @@ public:
 		{ 0x03, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Temperature sensor (Out)
 		{ 0x05, 0x10, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Intake CFM
 		{ 0x06, 0x10, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Exhaust CFM
+		{ 0x03, 0x10, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Intake RPM
+		{ 0x04, 0x10, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // Exhaust RPM
 
 		// Speeds
 		{ 0x06, 0x22, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // MED target CFM in.
@@ -264,6 +271,7 @@ public:
 	void setHumidityControl( bool enable );
 	void setHumiditySetpoint( float humidity );
 	void setCurrentHumidity( float humidity );
+	void setIntermittentPeriod( uint32_t period );
 
 private:
 
@@ -317,14 +325,17 @@ private:
 protected:
 	// esphome glue
 	std::string fan_mode_{};
+	
 	float fan_speed_{0.f};
 	float power_{0.f};
 	float temperature_{0.f};
 	float temperature_out_{0.f};
 	float supply_cfm_{0.f};
-	float exhaust_cf,_{0.f};
-	uint32_t filter_life_{0};
+	float exhaust_cfm_{0.f};
+	float supply_rpm_{0.f};
+	float exhaust_rpm_{0.f};
 
+	uint32_t filter_life_{0};
 };
 
 }  // namespace broan

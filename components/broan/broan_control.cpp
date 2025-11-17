@@ -148,6 +148,16 @@ void BroanComponent::setCurrentHumidity( float humidity ) {
 	writeRegisters( vecFields );
 }
 
+void BroanComponent::setIntermittentPeriod( uint32_t period ) {
+	std::vector<BroanField_t> vecFields;
+  
+	ESP_LOGI("broan_control", "Set int period: %i", period);
+
+	vecFields.push_back( m_vecFields[IntModeDuration].copyForUpdate( period ) );
+	m_vecFields[IntModeDuration].markDirty();
+
+	writeRegisters( vecFields );
+}
 
 }  // namespace broan
 }  // namespace esphome

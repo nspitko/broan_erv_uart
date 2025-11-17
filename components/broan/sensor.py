@@ -20,8 +20,11 @@ CONF_FILTER_LIFE = "filter_life"
 CONF_TEMPERATURE_OUT = "temperature_out"
 CONF_SUPPLY_CFM = "supply_fan_cfm"
 CONF_EXHAUST_CFM = "exhaust_fan_cfm"
+CONF_SUPPLY_RPM = "supply_fan_rpm"
+CONF_EXHAUST_RPM = "exhaust_fan_rpm"
 
 UNIT_CFM = "CFM"
+UNIT_RPM = "RPM"
 
 from . import CONF_BROAN_ID, BroanComponent
 
@@ -57,6 +60,14 @@ CONFIG_SCHEMA = cv.Schema(
             icon=ICON_FAN,
             unit_of_measurement=UNIT_CFM,
         ),
+        cv.Optional(CONF_SUPPLY_RPM): sensor.sensor_schema(
+            icon=ICON_FAN,
+            unit_of_measurement=UNIT_RPM,
+        ),
+        cv.Optional(CONF_EXHAUST_RPM): sensor.sensor_schema(
+            icon=ICON_FAN,
+            unit_of_measurement=UNIT_RPM,
+        ),
     }
 )
 
@@ -85,3 +96,11 @@ async def to_code(config):
     if exhaust_cfm_config := config.get(CONF_EXHAUST_CFM):
         sens = await sensor.new_sensor(exhaust_cfm_config)
         cg.add(broan_component.set_exhaust_cfm_sensor(sens))
+
+    if supply_rpm_config := config.get(CONF_SUPPLY_RPM):
+        sens = await sensor.new_sensor(supply_rpm_config)
+        cg.add(broan_component.set_supply_rpm_sensor(sens))
+
+    if exhaust_rpm_config := config.get(CONF_EXHAUST_RPM):
+        sens = await sensor.new_sensor(exhaust_rpm_config)
+        cg.add(broan_component.set_exhaust_rpm_sensor(sens))
