@@ -13,7 +13,6 @@ from esphome.const import (
     ICON_FAN,
     UNIT_WATT,
     UNIT_CELSIUS,
-    UNIT_SECOND,
 )
 
 CONF_FILTER_LIFE = "filter_life"
@@ -25,6 +24,7 @@ CONF_EXHAUST_RPM = "exhaust_fan_rpm"
 
 UNIT_CFM = "CFM"
 UNIT_RPM = "RPM"
+UNIT_DAY = "d"
 
 from . import CONF_BROAN_ID, BroanComponent
 
@@ -50,7 +50,7 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_FILTER_LIFE): sensor.sensor_schema(
             icon=ICON_AIR_FILTER,
-            unit_of_measurement=UNIT_SECOND,
+            unit_of_measurement=UNIT_DAY,
         ),
         cv.Optional(CONF_SUPPLY_CFM): sensor.sensor_schema(
             icon=ICON_FAN,

@@ -71,7 +71,7 @@ async def to_code(config):
 
     if intermittent_period_config := config.get(CONF_INT_PERIOD):
         h = await number.new_number(
-            intermittent_period_config, min_value=10, max_value=50, step=5
+            intermittent_period_config, min_value=10, max_value=50000, step=1
         )
         await cg.register_parented(h, config[CONF_BROAN_ID])
         cg.add(broan_component.set_intermittent_period_number(h))

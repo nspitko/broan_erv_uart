@@ -11,6 +11,9 @@ void BroanComponent::setup()
 	//esp_log_level_set("broan", ESP_LOG_DEBUG);
 
 	m_vecHeader.reserve(5);
+
+	for( int i=0; i<BroanField::MAX_FIELDS; i++ )
+		m_vecFields[i].markDirty();
 }
 
 
@@ -357,7 +360,9 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 			case BroanField::FilterLife:
 				if( !filter_life_sensor_ )
 					continue;
-				filter_life_sensor_->publish_state(pField->m_value.m_nValue);
+
+				// Seconds -> Days
+				filter_life_sensor_->publish_state(pField->m_value.m_nValue / ( 60 * 60 * 24 ) );
 			break;
 
 			case BroanField::TemperatureIn:
@@ -429,7 +434,8 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 			case BroanField::IntModeDuration:
 				if( !intermittent_period_number_ )
 					continue;
-				intermittent_period_number_->publish_state(pField->m_value.m_nValue);
+
+				intermittent_period_number_->publish_state(pField->m_value.m_nValue /* / 1000 */ );
 			break;
 #endif
 #ifdef USE_SWITCH

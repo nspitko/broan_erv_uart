@@ -150,6 +150,9 @@ void BroanComponent::setCurrentHumidity( float humidity ) {
 
 void BroanComponent::setIntermittentPeriod( uint32_t period ) {
 	std::vector<BroanField_t> vecFields;
+
+	// S -> MS
+	//period *= 1000;
   
 	ESP_LOGI("broan_control", "Set int period: %i", period);
 

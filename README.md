@@ -101,7 +101,7 @@ sensor:
     temperature:
       name: Temperature
 
-    # In seconds. This may change to days later
+    # In Days
     filter_life:
       name: Remaining Filter life
 
