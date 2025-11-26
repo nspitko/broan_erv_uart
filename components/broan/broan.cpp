@@ -38,10 +38,7 @@ void BroanComponent::loop()
 
 void BroanComponent::dump_config()
 {
-	UARTDevice::dump_config();
-
 	ESP_LOGCONFIG("broan", "Set flow control pin %i", this->flow_control_pin_);
-
 }
 
 void BroanComponent::set_flow_control_pin(GPIOPin *flow_control_pin)
