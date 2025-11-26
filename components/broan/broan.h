@@ -273,6 +273,9 @@ public:
 	void setCurrentHumidity( float humidity );
 	void setIntermittentPeriod( uint32_t period );
 
+	// DEFL: Copied from modbus
+	void set_flow_control_pin(GPIOPin *flow_control_pin) { this->flow_control_pin_ = flow_control_pin; }
+
 private:
 
 	uint32_t m_nLastHadControl = 0;
@@ -336,6 +339,9 @@ protected:
 	float exhaust_rpm_{0.f};
 
 	uint32_t filter_life_{0};
+
+	// DEFL: Copied from modbus
+	GPIOPin *flow_control_pin_{nullptr};
 };
 
 }  // namespace broan

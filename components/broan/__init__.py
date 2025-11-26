@@ -2,7 +2,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import uart
-from esphome.const import CONF_ID
+from esphome.const import CONF_ID, CONF_FLOW_CONTROL_PIN
 
 AUTO_LOAD = []
 DEPENDENCIES = ["uart"]
@@ -17,6 +17,7 @@ CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(BroanComponent),
+            cv.Optional(CONF_FLOW_CONTROL_PIN): pins.gpio_output_pin_schema,
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -41,3 +42,7 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
 
+    cg.add(var.set_role(config[CONF_ROLE]))
+    if CONF_FLOW_CONTROL_PIN in config:
+        pin = await gpio_pin_expression(config[CONF_FLOW_CONTROL_PIN])
+        cg.add(var.set_flow_control_pin(pin))
