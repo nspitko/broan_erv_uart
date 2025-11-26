@@ -39,7 +39,7 @@ void BroanComponent::loop()
 void BroanComponent::dump_config()
 {
 	ESP_LOGCONFIG("broan", "Broan:");
-  	LOG_PIN("  Flow Control Pin: ", this->flow_control_pin_);
+	ESP_LOGCONFIG("broan", "Flow Control Pin: %s", flow_control_pin_->dump_summary().c_str());
 }
 
 float Modbus::get_setup_priority() const
