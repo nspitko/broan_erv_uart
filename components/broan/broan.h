@@ -274,7 +274,7 @@ public:
 	void setIntermittentPeriod( uint32_t period );
 
 	// DEFL: Copied from modbus
-	void set_flow_control_pin(GPIOPin *flow_control_pin) { this->flow_control_pin_ = flow_control_pin; }
+	void set_flow_control_pin(GPIOPin *flow_control_pin);
 
 private:
 
