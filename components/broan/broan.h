@@ -185,7 +185,7 @@ class BroanComponent : public Component, public uart::UARTDevice
 
 public:
 	const uint8_t m_nServerAddress = 0x10;
-	const uint8_t m_nClientAddress = 0x12;
+	const uint8_t m_nClientAddress = 0x13;
 
 
 	bool m_bWaitForRemote = false;

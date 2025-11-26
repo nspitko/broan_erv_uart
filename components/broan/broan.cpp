@@ -534,10 +534,7 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 
 	// DEFL Copied from modbus
  	if (this->flow_control_pin_ != nullptr)
-	{
-    	this->flow_control_pin_->digital_write(false);
-		ESP_LOGD("broan","FC high");
-	}
+    	this->flow_control_pin_->digital_write(true);
 
 	uint8_t header = 0x01;
 	uint8_t alignment = 0x01;
@@ -555,10 +552,7 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 
 	// DEFL Copied from modbus
  	if (this->flow_control_pin_ != nullptr)
-	{
-    	this->flow_control_pin_->digital_write(true);
-		ESP_LOGD("broan","FC low");
-	}
+    	this->flow_control_pin_->digital_write(false);
 
 #endif
 }
