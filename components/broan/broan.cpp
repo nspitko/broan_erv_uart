@@ -552,7 +552,7 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 
 	// DEFL Copied from modbus
  	if (this->flow_control_pin_ != nullptr)
-    	this->flow_control_pin_->digital_write(false);
+    	this->flow_control_pin_->digital_write(true);
 
 #endif
 }
