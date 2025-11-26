@@ -19,6 +19,8 @@ void BroanComponent::setup()
   	if (this->flow_control_pin_ != nullptr) {
     	this->flow_control_pin_->setup();
   	}
+
+	ESP_LOGCONFIG("broan", "Done with setup");
 }
 
 
