@@ -261,6 +261,7 @@ public:
 	// uart overrides
 	void setup() override;
 	void loop() override;
+	void dump_config() override;
 
 public:
 	// Control API

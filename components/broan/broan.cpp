@@ -19,8 +19,6 @@ void BroanComponent::setup()
   	if (this->flow_control_pin_ != nullptr) {
     	this->flow_control_pin_->setup();
   	}
-
-	ESP_LOGW("broan", "Done with setup");
 }
 
 
@@ -36,6 +34,14 @@ void BroanComponent::loop()
 	replyIfAllowed();
 
 	runTasks();
+}
+
+void BroanComponent::dump_config()
+{
+	UARTDevice::dump_config();
+
+	ESP_LOGCONFIG("broan", "Set flow control pin %i", this->flow_control_pin_);
+
 }
 
 void BroanComponent::set_flow_control_pin(GPIOPin *flow_control_pin)
