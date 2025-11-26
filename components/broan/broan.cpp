@@ -20,7 +20,7 @@ void BroanComponent::setup()
     	this->flow_control_pin_->setup();
   	}
 
-	ESP_LOGCONFIG("broan", "Done with setup");
+	ESP_LOGW("broan", "Done with setup");
 }
 
 
@@ -41,7 +41,7 @@ void BroanComponent::loop()
 void BroanComponent::set_flow_control_pin(GPIOPin *flow_control_pin)
 { 
 	this->flow_control_pin_ = flow_control_pin;
-	ESP_LOGCONFIG("broan", "Set flow control pin %i", flow_control_pin);
+	ESP_LOGW("broan", "Set flow control pin %i", flow_control_pin);
 }
 
 bool BroanComponent::readHeader()
