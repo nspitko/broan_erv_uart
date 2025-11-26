@@ -38,7 +38,14 @@ void BroanComponent::loop()
 
 void BroanComponent::dump_config()
 {
-	ESP_LOGCONFIG("broan", "Flow control pin (from uart): %i", this->flow_control_pin_);
+	ESP_LOGCONFIG("broan", "Broan:");
+  	LOG_PIN("  Flow Control Pin: ", this->flow_control_pin_);
+}
+
+float Modbus::get_setup_priority() const
+{
+  // After UART bus
+  return setup_priority::BUS - 1.0f;
 }
 
 bool BroanComponent::readHeader()
@@ -534,7 +541,10 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 
 	// DEFL Copied from modbus
  	if (this->flow_control_pin_ != nullptr)
+	{
     	this->flow_control_pin_->digital_write(true);
+		ESP_LOGD("broan","FC high");
+	}
 
 	uint8_t header = 0x01;
 	uint8_t alignment = 0x01;
@@ -552,7 +562,10 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 
 	// DEFL Copied from modbus
  	if (this->flow_control_pin_ != nullptr)
-    	this->flow_control_pin_->digital_write(true);
+	{
+    	this->flow_control_pin_->digital_write(false);
+		ESP_LOGD("broan","FC low");
+	}
 
 #endif
 }
