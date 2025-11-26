@@ -14,6 +14,11 @@ void BroanComponent::setup()
 
 	for( int i=0; i<BroanField::MAX_FIELDS; i++ )
 		m_vecFields[i].markDirty();
+
+	// DEFL: Copied from modbus
+  	if (this->flow_control_pin_ != nullptr) {
+    	this->flow_control_pin_->setup();
+  	}
 }
 
 
@@ -521,6 +526,11 @@ void BroanComponent::handleUnknownField(uint32_t nOpcodeHigh, uint32_t nOpcodeLo
 void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 {
 #ifndef LISTEN_ONLY
+
+	// DEFL Copied from modbus
+ 	if (this->flow_control_pin_ != nullptr)
+    	this->flow_control_pin_->digital_write(true);
+
 	uint8_t header = 0x01;
 	uint8_t alignment = 0x01;
 	uint8_t footer = 0x04;
@@ -532,6 +542,12 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 	for (auto b : vecMessage) write(b);
 	write(calculateChecksum(m_nClientAddress, m_nServerAddress, vecMessage));
 	write(footer);
+
+	flush();
+
+	// DEFL Copied from modbus
+ 	if (this->flow_control_pin_ != nullptr)
+    	this->flow_control_pin_->digital_write(false);
 #endif
 }
 
