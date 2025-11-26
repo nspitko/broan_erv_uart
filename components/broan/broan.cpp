@@ -42,7 +42,7 @@ void BroanComponent::dump_config()
 	ESP_LOGCONFIG("broan", "Flow Control Pin: %s", flow_control_pin_->dump_summary().c_str());
 }
 
-float Modbus::get_setup_priority()
+float BroanComponent::get_setup_priority()
 {
   // After UART bus
   return setup_priority::BUS - 1.0f;
