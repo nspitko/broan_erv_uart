@@ -69,7 +69,6 @@ enum BroanFanMode
 	Turbo = 0x0c,
 	Humidity = 0x0d,
 	Away = 0x0F, // "OTH", no idea what this actually does?
-
 };
 
 enum BroanField
@@ -113,7 +112,6 @@ enum BroanField
 	UnknownB,
 
 	MAX_FIELDS,
-
 };
 
 struct BroanField_t
@@ -253,7 +251,6 @@ public:
 		{ 0x03, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering INT mode
 		{ 0x08, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering SMART mode, set to 1 in continuous modes.
 */
-
 	};
 
 	// uart overrides
@@ -263,6 +260,9 @@ public:
 	float get_setup_priority() const override;
 
 public:
+	// Setup
+	void set_flow_control_pin(GPIOPin *flow_control_pin) { this->flow_control_pin_ = flow_control_pin; }
+
 	// Control API
 	void setFanMode( std::string mode );
 	void setFanSpeed( float speed );
@@ -273,16 +273,12 @@ public:
 	void setCurrentHumidity( float humidity );
 	void setIntermittentPeriod( uint32_t period );
 
-	// DEFL: Copied from modbus
-	void set_flow_control_pin(GPIOPin *flow_control_pin) { this->flow_control_pin_ = flow_control_pin; }
-
 private:
 
 	uint32_t m_nLastHadControl = 0;
 	uint32_t m_unLastHeartbeat = 0; // Next time to send heartbeat
 
 	bool m_bERVReady = false;
-
 
 #ifdef SCAN_UNKNOWN
 	// Field scanner
@@ -340,7 +336,6 @@ protected:
 
 	uint32_t filter_life_{0};
 
-	// DEFL: Copied from modbus
 	GPIOPin *flow_control_pin_{nullptr};
 };
 

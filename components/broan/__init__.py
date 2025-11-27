@@ -9,7 +9,6 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ID, CONF_FLOW_CONTROL_PIN
 from esphome.cpp_helpers import gpio_pin_expression
 
-
 AUTO_LOAD = []
 DEPENDENCIES = ["uart"]
 CODEOWNERS = ["@nspitko"]
