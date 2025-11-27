@@ -39,7 +39,8 @@ void BroanComponent::loop()
 void BroanComponent::dump_config()
 {
 	ESP_LOGCONFIG("broan", "Broan:");
-	ESP_LOGCONFIG("broan", "Flow Control Pin: %s", flow_control_pin_->dump_summary().c_str());
+	if(this->flow_control_pin_!= nullptr)
+		ESP_LOGCONFIG("broan", "Flow Control Pin: %s", this->flow_control_pin_->dump_summary().c_str());
 }
 
 float BroanComponent::get_setup_priority() const
@@ -543,7 +544,7 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
  	if (this->flow_control_pin_ != nullptr)
 	{
     	this->flow_control_pin_->digital_write(true);
-		ESP_LOGD("broan","FC high");
+		// ESP_LOGD("broan","FC high");
 	}
 
 	uint8_t header = 0x01;
@@ -564,7 +565,7 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
  	if (this->flow_control_pin_ != nullptr)
 	{
     	this->flow_control_pin_->digital_write(false);
-		ESP_LOGD("broan","FC low");
+		// ESP_LOGD("broan","FC low");
 	}
 
 #endif
