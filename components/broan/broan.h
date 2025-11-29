@@ -69,7 +69,6 @@ enum BroanFanMode
 	Turbo = 0x0c,
 	Humidity = 0x0d,
 	Away = 0x0F, // "OTH", no idea what this actually does?
-
 };
 
 enum BroanField
@@ -113,7 +112,6 @@ enum BroanField
 	UnknownB,
 
 	MAX_FIELDS,
-
 };
 
 struct BroanField_t
@@ -187,9 +185,7 @@ public:
 	const uint8_t m_nServerAddress = 0x10;
 	const uint8_t m_nClientAddress = 0x12;
 
-
 	bool m_bWaitForRemote = false;
-
 
 	BroanField_t m_vecFields[BroanField::MAX_FIELDS] = {
 		// Known fields
@@ -255,14 +251,18 @@ public:
 		{ 0x03, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering INT mode
 		{ 0x08, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering SMART mode, set to 1 in continuous modes.
 */
-
 	};
 
 	// uart overrides
 	void setup() override;
 	void loop() override;
+	void dump_config() override;
+	float get_setup_priority() const override;
 
 public:
+	// Setup
+	void set_flow_control_pin(GPIOPin *flow_control_pin) { this->flow_control_pin_ = flow_control_pin; }
+
 	// Control API
 	void setFanMode( std::string mode );
 	void setFanSpeed( float speed );
@@ -279,7 +279,6 @@ private:
 	uint32_t m_unLastHeartbeat = 0; // Next time to send heartbeat
 
 	bool m_bERVReady = false;
-
 
 #ifdef SCAN_UNKNOWN
 	// Field scanner
@@ -336,6 +335,8 @@ protected:
 	float exhaust_rpm_{0.f};
 
 	uint32_t filter_life_{0};
+
+	GPIOPin *flow_control_pin_{nullptr};
 };
 
 }  // namespace broan

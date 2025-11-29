@@ -14,6 +14,9 @@ void BroanComponent::setup()
 
 	for( int i=0; i<BroanField::MAX_FIELDS; i++ )
 		m_vecFields[i].markDirty();
+
+  	if(flow_control_pin_)
+    	this->flow_control_pin_->setup();
 }
 
 
@@ -29,6 +32,19 @@ void BroanComponent::loop()
 	replyIfAllowed();
 
 	runTasks();
+}
+
+void BroanComponent::dump_config()
+{
+	ESP_LOGCONFIG("broan", "Broan:");
+	if(flow_control_pin_)
+		ESP_LOGCONFIG("broan", "Flow Control Pin: %s", this->flow_control_pin_->dump_summary().c_str());
+}
+
+float BroanComponent::get_setup_priority() const
+{
+  // After UART bus
+  return setup_priority::BUS - 1.0f;
 }
 
 bool BroanComponent::readHeader()
@@ -73,7 +89,6 @@ bool BroanComponent::readHeader()
 void BroanComponent::writeRegisters( const std::vector<BroanField_t> &values )
 {
 	std::vector<uint8_t> message;
-
 
 	message.push_back(0x40); // Write
 
@@ -521,6 +536,9 @@ void BroanComponent::handleUnknownField(uint32_t nOpcodeHigh, uint32_t nOpcodeLo
 void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 {
 #ifndef LISTEN_ONLY
+ 	if(flow_control_pin_)
+    	flow_control_pin_->digital_write(true);
+
 	uint8_t header = 0x01;
 	uint8_t alignment = 0x01;
 	uint8_t footer = 0x04;
@@ -532,6 +550,11 @@ void BroanComponent::send(const std::vector<uint8_t>& vecMessage)
 	for (auto b : vecMessage) write(b);
 	write(calculateChecksum(m_nClientAddress, m_nServerAddress, vecMessage));
 	write(footer);
+
+	flush();
+
+ 	if(flow_control_pin_)
+    	flow_control_pin_->digital_write(false);
 #endif
 }
 

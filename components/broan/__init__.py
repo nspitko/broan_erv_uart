@@ -1,8 +1,13 @@
-# __init__.py
+from __future__ import annotations
+
+from typing import Literal
+
+from esphome import pins
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import uart
-from esphome.const import CONF_ID
+import esphome.config_validation as cv
+from esphome.const import CONF_ID, CONF_FLOW_CONTROL_PIN
+from esphome.cpp_helpers import gpio_pin_expression
 
 AUTO_LOAD = []
 DEPENDENCIES = ["uart"]
@@ -13,14 +18,15 @@ BroanComponent = broan_ns.class_("BroanComponent", cg.Component, uart.UARTDevice
 
 CONF_BROAN_ID = "broan_id"
 
-CONFIG_SCHEMA = cv.All(
+CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(BroanComponent),
+            cv.Optional(CONF_FLOW_CONTROL_PIN): pins.gpio_output_pin_schema,
         }
     )
-    .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA)
+    .extend(uart.UART_DEVICE_SCHEMA)
 )
 
 BroanBaseSchema = cv.Schema(
@@ -36,8 +42,14 @@ FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
     parity="NONE",
     stop_bits=1,
 )
+
 async def to_code(config):
+    cg.add_global(broan_ns.using)
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+
     await uart.register_uart_device(var, config)
 
+    if CONF_FLOW_CONTROL_PIN in config:
+        pin = await gpio_pin_expression(config[CONF_FLOW_CONTROL_PIN])
+        cg.add(var.set_flow_control_pin(pin))
