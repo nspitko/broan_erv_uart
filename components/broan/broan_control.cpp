@@ -8,21 +8,23 @@ void BroanComponent::setFanMode( std::string mode )
 	uint8_t value = 0x01;
 
 	if( mode == "min")
-		value = 0x09;
+		value = BroanFanMode::Min;
 	else if (mode == "max" )
-		value = 0x0a;
+		value = BroanFanMode::Max;
 	else if( mode == "manual" )
-		value = 0x0b;
+		value = BroanFanMode::Manual;
 	else if( mode == "int" )
-		value = 0x08;
+		value = BroanFanMode::Intermittent;
 	else if( mode == "turbo" )
-		value = 0x0c;
+		value = BroanFanMode::Turbo;
 	else if( mode == "humidity" )
-		value = 0x0d;
+		value = BroanFanMode::Humidity;
 	else if( mode == "ovr" )
-		value = 0x02;
+		value = BroanFanMode::Ovr;
+	else if( mode == "recirculate" )
+		value = BroanFanMode::Recirculate;
 	else
-		value = 0x01;
+		value = BroanFanMode::Off;
 
 
 	std::vector<BroanField_t> vecFields;

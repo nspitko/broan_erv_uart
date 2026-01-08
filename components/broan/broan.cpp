@@ -349,13 +349,14 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				std::string strMode;
 				switch( pField->m_value.m_chValue )
 				{
-					case 0x02: strMode = "ovr"; break;
-					case 0x08: strMode = "int"; break;
-					case 0x09: strMode = "min"; break;
-					case 0x0a: strMode = "max"; break;
-					case 0x0b: strMode = "manual"; break;
-					case 0x0c: strMode = "turbo"; break;
-					case 0x0d: strMode = "humidity"; break;
+					case BroanFanMode::Ovr: strMode = "ovr"; break;
+					case BroanFanMode::Intermittent: strMode = "int"; break;
+					case BroanFanMode::Min: strMode = "min"; break;
+					case BroanFanMode::Max: strMode = "max"; break;
+					case BroanFanMode::Manual: strMode = "manual"; break;
+					case BroanFanMode::Turbo: strMode = "turbo"; break;
+					case BroanFanMode::Humidity: strMode = "humidity"; break;
+					case BroanFanMode::Recirculate: strMode = "recirculate"; break;
 
 					default: strMode = "off"; break;
 				}

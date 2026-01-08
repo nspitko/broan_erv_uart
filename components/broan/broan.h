@@ -62,6 +62,7 @@ enum BroanFanMode
 	Off = 0x01,
 	Ovr = 0x02,
 	Intermittent = 0x08,
+	Recirculate = 0x06,
 	Min = 0x09,
 	Max = 0x0a,
 	Smart = 0x11,
