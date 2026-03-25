@@ -37,8 +37,10 @@ void BroanComponent::loop()
 void BroanComponent::dump_config()
 {
 	ESP_LOGCONFIG("broan", "Broan:");
+	char buffer[255];
+	this->flow_control_pin_->dump_summary( buffer, 255 );
 	if(flow_control_pin_)
-		ESP_LOGCONFIG("broan", "Flow Control Pin: %s", this->flow_control_pin_->dump_summary().c_str());
+		ESP_LOGCONFIG("broan", "Flow Control Pin: %s", buffer );
 }
 
 float BroanComponent::get_setup_priority() const

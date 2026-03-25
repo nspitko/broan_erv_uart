@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esphome.h"
+#include <deque>
 #include "esphome/core/component.h"
 
 #ifdef USE_SELECT
