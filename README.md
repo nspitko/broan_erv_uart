@@ -2,16 +2,30 @@
 
 An ESP32 component to communicate with Broan, Nutone, Venmar, and VanEE ERVs via their rs485 interface.
 
-**This is a work in progress, expect bugs, missing features, and schema changes**
-
 The protocol is documented [here](https://spitko.net/2025/08/08/Reverse-Engineering-an-ERV/)
 
-Right now we're mostly missing information on which registers do what. If you have a VTTOUCHW, we could use packet captures from this.
+Currently this project is stable, but may be missing some advanced features from certain models. If there is a feature you'd like added, please open an issue. We may need packet capture from a unit with this functionality.
+
+<table>
+  <tr>
+    <td>
+      <img width="332" height="477" alt="image" src="https://github.com/user-attachments/assets/5170773c-7def-4df2-bef0-9fa33ca78082" />
+    </td>
+    <td valign="top">
+      <img width="329" height="367" alt="image" src="https://github.com/user-attachments/assets/2e4aba9a-a7a8-4349-9e79-a22f0018b23a" />
+    </td>
+  </tr>
+</table>
+
+## Supported models
+We currently don't have a good range of what does and don't work, but it's currently believed that all Broan, Nutone, and VanEE ERVs that have rs485 inputs probably work. The easiest way to check is to see if your unit supports the VTTOUCHW (All three brands have a version of this interface, they are all presumed to be the same)
+
+HRVs have been reported to work as well, but tend to support fewer features. You can safely remove sensors from the yaml that your device does not support.
 
 ## Requirements
-1) You will need an esphome device that can communicate over rs485. Some devices come with this out of the box (waveshare esp32-s3-relay-6ch), or you can just buy an external tranceiver and wire it to the uart of your choice.
-2) This library does not coexist with other serial wall remotes. This is a software limitation on the ERV itself, it will only ever respond to one device on the bus. It's theoretically possible to MITM a remote but that's outside the scope of this component. If you want to retain a wall control device, buy one of the aux remotes that use the dry contact interface, those will continue to function as expected.
-3) You will ideally want to power this directly from the 12v output on the erv itself. this isn't a hard requirement but if the ERV is power cycled it make take some time for things to re-intitialize. It's generally OK to restart the ESP at any time though. Some devices support this out of the box, but most do not, so if you're not using the waveshare device you'll want a buck converter.
+1) You will need an esphome device that can communicate over rs485. Some devices come with this out of the box (waveshare esp32-s3-relay-6ch), or you can just buy an external tranceiver and wire it to the uart of your choice. Note that the waveshare device listed earlier is much easier to use than most, as it has automatic flow control and can be powered directly from the 12v output on your ERV. If you use a different device and make a working, stable configuration, please open an issue so we can start building a list with configuration files.
+2) This library does not coexist with other serial wall remotes. This is a software limitation on the ERV itself, it will only ever respond to one device on the bus. It's theoretically possible to MITM a remote but that's outside the scope of this component.
+3) You will ideally want to power this directly from the 12v output on the erv itself. this isn't a hard requirement, but it simplifies things a lot. If the ERV completes the handshake with the esp32 and it later goes away, the ERV will eventually drop into an error state and shut down, so it's just one less point of failure.
 
 ## Installation
 Near the control interface on the ERV, look for a green terminal block that has D+, D-, and GND on it (typically a 6 terminal block that includes 12V, LED, and OVR). Connect the D+, D-, and GND connectors to your RS485 tranceiver. Ideally you can also use the +12v but very few ESP32s are set up to handle input voltages above 5V to check with your spec sheet first. If not, just use a USB cable and wall charger. If you go this route, you may need to additionally run a wire from the GND terminal on the ERV to the GND pin on the esp32, but this will depend on how your rs485 tranceiver is set up. Only do this if you're getting unexplained communication errors or crashes.
@@ -38,7 +52,9 @@ To use humidity control mode once it is enabled, set the desired humidity with "
 ## FAQ
 Q: I see errors about failed communication
 
-A: Either you have the RS485 wires reversed, or you didn't restart the ERV after connecting the ESP32.
+A: This could be a lot of things.
+- If you're getting timeouts, it's probably the yaml being misconfigured. A lot of rs485 devices want a flow control pin, which needs to be specified (check your device's datasheet)
+- If you see it getting data but complaining about alignment and unknown commands, it's likely either you swapped the +/- wires, or the communication is very weak. Double check that you wired up the ground wire correctly, and try adding or removing esp side termination.
 
 Q: Why doesn't it support X?
 
@@ -46,7 +62,7 @@ A: Not everything is actually exposed via the rs485 interface. I may need dumps 
 
 Q: What if I still want wall controls?
 
-A: You can use the aux remotes, those use the dry contact interface which is a hard override. The fan mode will indicate "ovr" (override) when these controls are used. This is how Broan bypasses the protocol limitation. If you don't want to control anything, it's possible to snoop the interface to read sensor values, I use this mode for debugging but it's not exposed as a feature yet since it doesn't seem useful to me Feel free to make a case for it.
+A: You can use the aux remotes, those use the dry contact interface which is a hard override. The fan mode will indicate "ovr" (override) when these controls are used. This is how Broan bypasses the protocol limitation. Alternatively, look at something like the Sonoff NSPanel and control the device via Home Assistant instead.
 
 ### ESPhome yaml
 Add this to an existing config.
