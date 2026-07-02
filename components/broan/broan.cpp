@@ -10,10 +10,18 @@ void BroanComponent::setup()
 	Component::setup();
 	//esp_log_level_set("broan", ESP_LOG_DEBUG);
 
-	m_vecHeader.reserve(5);
-
 	for( int i=0; i<BroanField::MAX_FIELDS; i++ )
 		m_vecFields[i].markDirty();
+
+#ifdef USE_SENSOR
+	// Seed the flow/speed sensors to 0 so they read 0 (not "unknown") after a
+	// boot that lands in an intermittent-off window, where the ERV stops
+	// returning the CFM/RPM registers. Real polls overwrite this immediately.
+	if( supply_cfm_sensor_ )  supply_cfm_sensor_->publish_state(0);
+	if( exhaust_cfm_sensor_ ) exhaust_cfm_sensor_->publish_state(0);
+	if( supply_rpm_sensor_ )  supply_rpm_sensor_->publish_state(0);
+	if( exhaust_rpm_sensor_ ) exhaust_rpm_sensor_->publish_state(0);
+#endif
 
   	if(flow_control_pin_)
     	this->flow_control_pin_->setup();
@@ -90,7 +98,7 @@ bool BroanComponent::readHeader()
 	return true;
 }
 
-void BroanComponent::writeRegisters( const std::vector<BroanField_t> &values )
+bool BroanComponent::writeRegisters( const std::vector<BroanField_t> &values )
 {
 	std::vector<uint8_t> message;
 
@@ -106,7 +114,7 @@ void BroanComponent::writeRegisters( const std::vector<BroanField_t> &values )
 			message.push_back( value.m_value.m_rgBytes[i] );
 	}
 
-	queueMessage( message );
+	return queueMessage( message );
 }
 
 bool BroanComponent::readMessage()
@@ -159,29 +167,12 @@ bool BroanComponent::readMessage()
 	return true;
 }
 
-void esp_log_vector_hex(const char* tag, const std::vector<uint8_t>& message) {
-    if (message.empty()) {
-        ESP_LOGW(tag, "Message vector is empty");
-        return;
-    }
-    std::string hex_string;
-    for (size_t i = 0; i < message.size(); ++i) {
-        char buf[4];
-        snprintf(buf, sizeof(buf), "%02X ", message[i]);
-        hex_string += buf;
-        // Optional: newline every 16 bytes for readability
-        if ((i + 1) % 16 == 0) {
-            ESP_LOGW(tag, "%s", hex_string.c_str());
-            hex_string.clear();
-        }
-    }
-    if (!hex_string.empty()) {
-        ESP_LOGW(tag, "%s", hex_string.c_str());
-    }
-}
-
 void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::vector<uint8_t>& message)
 {
+	// A zero-length payload can pass the checksum; don't index into it.
+	if( message.empty() )
+		return;
+
 	if( target == m_nServerAddress )
 	{
 		if( message[0] == 0x03 )
@@ -228,7 +219,8 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 		case 0x41:
 		{
 			// set register ACK, mark all fields dirty
-			for( int i=1; i<message.size(); i+=2)
+			// (i+1 bound: an even-sized payload would otherwise read one past the end)
+			for( size_t i=1; i+1<message.size(); i+=2)
 			{
 				BroanField_t *pField = lookupField(message[i], message[i+1]);
 				if( !pField )
@@ -259,7 +251,7 @@ void BroanComponent::handleMessage(uint8_t sender, uint8_t target, const std::ve
 		{
 			// Log unhandled m_nType
 			ESP_LOGW("broan", "Unhandled m_nType %02X", m_nType);
-			esp_log_vector_hex("broan", message );
+			ESP_LOGW("broan", "%s", format_hex_pretty(message).c_str());
 			break;
 		}
 	}
@@ -299,46 +291,233 @@ void BroanComponent::replyIfAllowed()
 
 }
 
-void BroanComponent::queueMessage(std::vector<uint8_t>& message)
+bool BroanComponent::queueMessage(std::vector<uint8_t>& message)
 {
 	if( m_vecSendQueue.size() > 20 )
 	{
 		ESP_LOGW("broan","Dropping queued message: Stack is full. (Tried to queue %02X)",message[0]);
-		return;
+		return false;
 	}
 	m_vecSendQueue.push_back(message);
+	return true;
 }
 
+
+// Decode the raw fault register (17 00) into a human-readable status using the
+// service-manual E/W code table. ASSUMES the register holds the printed E/W code
+// number; 0xFFFFFFFF (and 0) = no fault. Encoding is unverified until the first
+// real fault — the raw fault_code sensor is kept for exactly that check.
+static std::string decodeBroanFault( uint32_t code )
+{
+	switch( code )
+	{
+		case 0xFFFFFFFFu:
+		case 0:  return "OK";
+		// Dampers
+		case 1:  return "E01 Supply damper range";
+		case 2:  return "E02 Supply damper timeout";
+		case 3:  return "E03 Supply damper";
+		case 5:  return "E05 Exhaust damper range";
+		case 6:  return "E06 Exhaust damper timeout";
+		case 7:  return "E07 Exhaust damper";
+		case 9:  return "E09 Recirculation damper range";
+		case 10: return "E10 Recirculation damper timeout";
+		case 11: return "E11 Recirculation damper";
+		// Airflow (E and W share these numbers + descriptions)
+		case 22: return "E22 Supply airflow";
+		case 32: return "E32 Exhaust airflow";
+		// Supply motor
+		case 23: return "E23 Supply motor over-current";
+		case 24: return "E24 Supply motor over-voltage";
+		case 25: return "E25 Supply motor under-voltage";
+		case 26: return "E26 Supply motor over-temp";
+		case 27: return "E27 Supply motor foc duration";
+		case 28: return "E28 Supply motor speed feedback";
+		case 29: return "E29 Supply motor startup";
+		// Exhaust motor
+		case 33: return "E33 Exhaust motor over-current";
+		case 34: return "E34 Exhaust motor over-voltage";
+		case 35: return "E35 Exhaust motor under-voltage";
+		case 36: return "E36 Exhaust motor over-temp";
+		case 37: return "E37 Exhaust motor foc duration";
+		case 38: return "E38 Exhaust motor speed feedback";
+		case 39: return "E39 Exhaust motor startup";
+		// Thermistors / board
+		case 40: return "E40 Outside air thermistor";
+		case 41: return "E41 Distribution air thermistor";
+		case 42: return "E42 PCBA thermistor";
+		case 43: return "E43 PCBA over-temp";
+		// Wall control
+		case 50: return "E50 Wall control comms lost";
+		case 51: return "E51 Wall control sensor";
+		// Protection / warning-only numbers
+		case 60: return "E60 Protection mode";
+		case 52: return "W52 Initial setting incomplete";
+		case 61: return "W61 Electronics overheating (protection)";
+	}
+	char buf[32];
+	snprintf( buf, sizeof(buf), "Fault code %u", (unsigned)code );
+	return buf;
+}
+
+// Decode the warning register (1A 00) — same numeric space as the fault codes
+// but W-prefixed on the unit's display. Confirmed 2026-07-01 by forcing W22 +
+// W32 (blocked airflow): the register alternates through concurrent warnings.
+static std::string decodeBroanWarning( uint32_t code )
+{
+	switch( code )
+	{
+		case 0xFFFFFFFFu:
+		case 0:  return "OK";
+		case 22: return "W22 Supply airflow";
+		case 32: return "W32 Exhaust airflow";
+		case 40: return "W40 Outside air thermistor";
+		case 52: return "W52 Initial setting incomplete";
+		case 61: return "W61 Electronics overheating (protection)";
+	}
+	char buf[32];
+	snprintf( buf, sizeof(buf), "Warning code %u", (unsigned)code );
+	return buf;
+}
+
+// Decode the executing-airflow-state register (07 20), mapped 2026-07-02 by
+// mode-cycling against live CFM: 0 = fans idle, nonzero = air actually moving,
+// value = the running profile. Min/smart/recirculate values not yet observed —
+// they fall through to "Running (code N)"; extend this table as HA history
+// captures them (the raw Active Mode Code sensor keeps the number).
+static std::string decodeBroanActiveMode( uint8_t code )
+{
+	switch( code )
+	{
+		case 0: return "Idle";
+		case 2: return "Max";
+		case 3: return "Turbo";
+		case 4: return "Intermittent";
+	}
+	char buf[24];
+	snprintf( buf, sizeof(buf), "Running (code %u)", (unsigned)code );
+	return buf;
+}
 
 void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 {
     size_t i = 1;
 	bool bPublish = false;
 
-    while (i < message.size())
+    // Bounds: the checksum is a plain 8-bit sum over the received bytes, so it
+    // says nothing about the inner TLV structure being sane — validate every
+    // triplet header and its claimed length before touching the payload.
+    while (i + 3 <= message.size())
     {
         uint8_t nOpcodeHigh = message[i++];
         uint8_t nOpcodeLow  = message[i++];
 		size_t len = message[i++];
 		uint32_t nDataPos = i;
 
+		if( len > message.size() - nDataPos )
+		{
+			ESP_LOGW("broan", "Truncated field %02X%02X: len %u exceeds payload; dropping rest of frame",
+				nOpcodeHigh, nOpcodeLow, (unsigned)len);
+			break;
+		}
+
 		i += len;
+
+		// String identity registers (02 00 / 02 60) carry ASCII that does not
+		// fit the 4-byte field union — handle + skip them before the copy below.
+		if( ( nOpcodeHigh == 0x02 && nOpcodeLow == 0x00 ) ||
+		    ( nOpcodeHigh == 0x02 && nOpcodeLow == 0x60 ) )
+		{
+#ifdef USE_TEXT_SENSOR
+			// data() + offset stays valid at len==0 (unlike &message[nDataPos]);
+			// skip the re-publish when unchanged — these registers never change,
+			// and TextSensor::publish_state has no dedup of its own.
+			std::string s( reinterpret_cast<const char*>(message.data() + nDataPos), len );
+			if( nOpcodeLow == 0x00 && firmware_text_sensor_ &&
+				( !firmware_text_sensor_->has_state() || firmware_text_sensor_->state != s ) )
+				firmware_text_sensor_->publish_state( s );
+			if( nOpcodeLow == 0x60 && model_text_sensor_ &&
+				( !model_text_sensor_->has_state() || model_text_sensor_->state != s ) )
+				model_text_sensor_->publish_state( s );
+#endif
+			continue;
+		}
+
+		// 3-byte version registers (01 00 firmware, 01 60 hardware). Bytes are
+		// PLAIN DECIMAL, confirmed 2026-07-02 against the unit's boot screen
+		// (MAJ 001 / MIN 101 / REV 040): 01 65 28 => "1.101.40". (The first
+		// guess was BCD/hex "%x" which showed 1.65.28 — wrong.)
+		if( ( nOpcodeHigh == 0x01 && nOpcodeLow == 0x00 && len >= 3 ) ||
+		    ( nOpcodeHigh == 0x01 && nOpcodeLow == 0x60 && len >= 3 ) )
+		{
+#ifdef USE_TEXT_SENSOR
+			char buf[24];
+			snprintf( buf, sizeof(buf), "%u.%u.%u",
+				message[nDataPos], message[nDataPos+1], message[nDataPos+2] );
+			if( nOpcodeLow == 0x00 && firmware_version_text_sensor_ &&
+				( !firmware_version_text_sensor_->has_state() || firmware_version_text_sensor_->state != buf ) )
+				firmware_version_text_sensor_->publish_state( buf );
+			if( nOpcodeLow == 0x60 && hardware_rev_text_sensor_ &&
+				( !hardware_rev_text_sensor_->has_state() || hardware_rev_text_sensor_->state != buf ) )
+				hardware_rev_text_sensor_->publish_state( buf );
+#endif
+			continue;
+		}
+
+#ifdef DUMP_GROUP
+		// Diagnostic: raw dump of every register in the target group, each pass.
+		// Falls through (no continue) so mapped fields in the group still parse —
+		// otherwise a 0x50 dump would kill the Power/CFM-min-max entities.
+		if( nOpcodeLow == DUMP_GROUP )
+		{
+			union { uint8_t b[4]; uint32_t u; float f; } v = {};
+			for( size_t b = 0; b < len && b < 4; ++b )
+				v.b[b] = message[nDataPos + b];
+			if( len == 0 )
+				ESP_LOGD("broan","DUMP %02X%02X len=0 (void)", nOpcodeHigh, nOpcodeLow);
+			else if( len == 1 )
+				ESP_LOGD("broan","DUMP %02X%02X byte=%u (0x%02X)", nOpcodeHigh, nOpcodeLow, v.b[0], v.b[0]);
+			else if( len == 4 )
+				ESP_LOGD("broan","DUMP %02X%02X int=%u float=%f hex=%02X%02X%02X%02X", nOpcodeHigh, nOpcodeLow, v.u, v.f, v.b[0], v.b[1], v.b[2], v.b[3]);
+			else
+				ESP_LOGD("broan","DUMP %02X%02X len=%u hex=%s", nOpcodeHigh, nOpcodeLow, (unsigned)len, format_hex_pretty(&message[nDataPos], len).c_str());
+		}
+#endif
 
 		uint32_t unField = lookupFieldIndex(nOpcodeHigh, nOpcodeLow);
 		if( unField == INVALID_FIELD )
-			continue;
-
-		BroanField_t *pField = &m_vecFields[unField];
-		if( !pField )
 		{
+			// Log/track registers not in the known map so the
+			// SCAN_UNKNOWN dump actually surfaces them (was previously dropped).
 			handleUnknownField(nOpcodeHigh, nOpcodeLow, len, nDataPos, message);
 			continue;
 		}
 
+		BroanField_t *pField = &m_vecFields[unField];
+
 		uint32_t oldVal = pField->m_value.m_nValue;
-		for (size_t b = 0; b < len; ++b)
+		// b < 4: never let a wire-supplied len overflow the 4-byte union into
+		// the poll-rate/last-update members behind it.
+		for (size_t b = 0; b < len && b < 4; ++b)
 			pField->m_value.m_rgBytes[b] = static_cast<char>(message[nDataPos+b]);
-	
+
+		// If we just wrote this field, ignore read-backs that don't yet reflect
+		// our value (stale in-flight reads) until it matches or the window ends —
+		// otherwise the HA entity flips back to the old value momentarily.
+		{
+			auto itPend = m_pendingWrites.find( unField );
+			if( itPend != m_pendingWrites.end() )
+			{
+				bool expired = (int32_t)( millis() - itPend->second.expiry ) >= 0;
+				if( !expired && pField->m_value.m_nValue != itPend->second.value )
+				{
+					pField->m_value.m_nValue = oldVal;  // drop this stale read
+					continue;
+				}
+				m_pendingWrites.erase( itPend );  // confirmed (or gave up)
+			}
+		}
+
 		if( oldVal == pField->m_value.m_nValue )
 			continue;
 
@@ -361,6 +540,8 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 					case BroanFanMode::Turbo: strMode = "turbo"; break;
 					case BroanFanMode::Humidity: strMode = "humidity"; break;
 					case BroanFanMode::Recirculate: strMode = "recirculate"; break;
+					case BroanFanMode::Smart: strMode = "smart"; break;
+					case BroanFanMode::Away: strMode = "away"; break;
 
 					default: strMode = "off"; break;
 				}
@@ -383,6 +564,81 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 
 				// Seconds -> Days
 				filter_life_sensor_->publish_state(pField->m_value.m_nValue / ( 60 * 60 * 24 ) );
+			break;
+
+			case BroanField::Uptime:
+				if( !uptime_sensor_ )
+					continue;
+
+				uptime_sensor_->publish_state(pField->m_value.m_nValue);
+			break;
+
+			// Diagnostic 0xE0 fields — unidentified; expose raw floats so HA
+			// history can reveal whether they track temp / humidity / runtime.
+			case BroanField::UnknownC:  // 07E0
+				if( aux_07e0_sensor_ )
+					aux_07e0_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+			case BroanField::UnknownA:  // 08E0
+				if( aux_08e0_sensor_ )
+					aux_08e0_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+			case BroanField::UnknownB:  // 09E0
+				if( aux_09e0_sensor_ )
+					aux_09e0_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+
+			// Read-only diagnostic: fault code. The wire idles at 0xFFFFFFFF
+			// (= no fault), which a float sensor would render as 4294967296 —
+			// publish 0 for the idle sentinel so the HA graph stays usable.
+			case BroanField::FaultCode:  // 17 00
+				if( fault_code_sensor_ )
+					fault_code_sensor_->publish_state(
+						pField->m_value.m_nValue == 0xFFFFFFFFu ? 0 : pField->m_value.m_nValue );
+#ifdef USE_TEXT_SENSOR
+				if( fault_status_text_sensor_ )
+					fault_status_text_sensor_->publish_state( decodeBroanFault(pField->m_value.m_nValue) );
+#endif
+			break;
+
+			// Warning register (1A 00): idle 0xFFFFFFFF published as 0, like the
+			// fault code. With multiple warnings active it cycles between their
+			// codes every poll, so HA history shows all of them.
+			case BroanField::WarningCode:
+			{
+				uint32_t code = pField->m_value.m_nValue;
+				if( warning_code_sensor_ )
+					warning_code_sensor_->publish_state( code == 0xFFFFFFFFu ? 0 : code );
+#ifdef USE_TEXT_SENSOR
+				if( warning_status_text_sensor_ )
+					warning_status_text_sensor_->publish_state( decodeBroanWarning(code) );
+#endif
+			}
+			break;
+
+			// Base fan mode (02 20): the BroanFanMode enum value the unit falls
+			// back to after a turbo/ovr overlay expires. Raw code, diagnostic.
+			case BroanField::BaseModeCode:
+				if( base_mode_code_sensor_ )
+					base_mode_code_sensor_->publish_state(pField->m_value.m_chValue);
+			break;
+
+			// Executing airflow state (07 20): the fans-running source of truth.
+			// 0 = idle, nonzero = air moving (value = running profile).
+			case BroanField::ActiveModeCode:
+			{
+				uint8_t code = pField->m_value.m_chValue;
+				if( active_mode_code_sensor_ )
+					active_mode_code_sensor_->publish_state(code);
+#ifdef USE_BINARY_SENSOR
+				if( fans_running_binary_sensor_ )
+					fans_running_binary_sensor_->publish_state(code != 0);
+#endif
+#ifdef USE_TEXT_SENSOR
+				if( active_mode_text_sensor_ )
+					active_mode_text_sensor_->publish_state( decodeBroanActiveMode(code) );
+#endif
+			}
 			break;
 
 			case BroanField::TemperatureIn:
@@ -438,24 +694,40 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 				humidity_setpoint_number_->publish_state(pField->m_value.m_flValue);
 			break;
 
-			// @todo: We don't support unbalanced values here currently....
+			// Fan Speed % depends on three registers (Medium value against the
+			// Min/Max range) that can arrive in any order — recompute whenever
+			// any of them lands; publishFanSpeed() no-ops until all are sane.
+			// (Previously this remapped on Medium alone: at boot Min/Max were
+			// still 0, the divide-by-zero published +inf, and the change-gate
+			// above meant it was never corrected.)
 			case BroanField::CFMIn_Medium:
-			{
-				if( !fan_speed_number_ )
-					continue;
-
-				float flMin = m_vecFields[CFMIn_Min].m_value.m_flValue;
-				float flMax = m_vecFields[CFMIn_Max].m_value.m_flValue;
-				float flAdjusted = remap( pField->m_value.m_flValue, flMin, flMax, 0.f, 100.f );
-				fan_speed_number_->publish_state(flAdjusted);
-			}
+			case BroanField::CFMIn_Min:
+			case BroanField::CFMIn_Max:
+				publishFanSpeed();
 			break;
 
 			case BroanField::IntModeDuration:
 				if( !intermittent_period_number_ )
 					continue;
 
-				intermittent_period_number_->publish_state(pField->m_value.m_nValue /* / 1000 */ );
+				// Register is seconds; HA shows minutes.
+				intermittent_period_number_->publish_state(pField->m_value.m_nValue / 60 );
+			break;
+
+			case BroanField::FilterInterval:
+				if( !filter_interval_number_ )
+					continue;
+
+				// Seconds -> Days
+				filter_interval_number_->publish_state(pField->m_value.m_nValue / ( 60 * 60 * 24 ) );
+			break;
+
+			case BroanField::OverrideDuration:
+				if( !override_duration_number_ )
+					continue;
+
+				// Seconds -> Minutes
+				override_duration_number_->publish_state(pField->m_value.m_nValue / 60 );
 			break;
 #endif
 #ifdef USE_SWITCH
@@ -467,6 +739,15 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 			break;
 	#endif
 		}
+
+#ifdef USE_NUMBER
+		// Push current value back to any CFM setpoint number entity bound to this field.
+		{
+			auto itNum = cfm_numbers_.find( unField );
+			if( itNum != cfm_numbers_.end() )
+				itNum->second->publish_state( pField->m_value.m_flValue );
+		}
+#endif
 
 		switch( pField->m_nType )
 		{
@@ -486,6 +767,26 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
     }
 
 }
+
+#ifdef USE_NUMBER
+void BroanComponent::publishFanSpeed()
+{
+	if( !fan_speed_number_ )
+		return;
+
+	float flMin = m_vecFields[CFMIn_Min].m_value.m_flValue;
+	float flMax = m_vecFields[CFMIn_Max].m_value.m_flValue;
+	float flMed = m_vecFields[CFMIn_Medium].m_value.m_flValue;
+
+	// All three registers must have real values (they arrive in any order at
+	// boot) and the range must be sane before remap — no divide-by-zero infs.
+	if( !(flMin > 0.f) || !(flMax > flMin) || !(flMed > 0.f) )
+		return;
+
+	float flAdjusted = remap( flMed, flMin, flMax, 0.f, 100.f );
+	fan_speed_number_->publish_state( std::max(0.f, std::min(100.f, flAdjusted)) );
+}
+#endif
 
 void BroanComponent::handleUnknownField(uint32_t nOpcodeHigh, uint32_t nOpcodeLow, uint8_t len, uint32_t i, const std::vector<uint8_t>& message )
 {
@@ -650,6 +951,10 @@ void BroanComponent::runTasks()
 		std::vector<unsigned char> vecRequest;
 		vecRequest.push_back(0x20);
 
+#ifdef DUMP_GROUP
+		m_nGroupCursor = DUMP_GROUP;  // pin the sweep to one group
+#endif
+
 		for( int i=0; i<15;i++)
 		{
 			vecRequest.push_back(m_nFieldCursor);
@@ -668,7 +973,9 @@ void BroanComponent::runTasks()
 					case 0x40: m_nGroupCursor = 0x50; break;
 					case 0x50: m_nGroupCursor = 0x60; break;
 					case 0x60: m_nGroupCursor = 0xE0; break;
-					case 0xE0: m_nGroupCursor = 0x20; break;
+					case 0xE0: m_nGroupCursor = 0x00; break;
+						case 0x00: m_nGroupCursor = 0x10; break;
+						case 0x10: m_nGroupCursor = 0x20; break;
 					//case 0xF0: m_nGroupCursor = 0x20; break;
 				}
 				//ESP_LOGD("broan","Brute force: Group is now %02X ", m_nGroupCursor );

@@ -2,6 +2,7 @@
 
 #include "esphome.h"
 #include <deque>
+#include <map>
 #include "esphome/core/component.h"
 
 #ifdef USE_SELECT
@@ -14,6 +15,14 @@
 
 #ifdef USE_SWITCH
 #include "esphome/components/switch/switch.h"
+#endif
+
+#ifdef USE_TEXT_SENSOR
+#include "esphome/components/text_sensor/text_sensor.h"
+#endif
+
+#ifdef USE_BINARY_SENSOR
+#include "esphome/components/binary_sensor/binary_sensor.h"
 #endif
 
 #include "esphome/components/uart/uart.h"
@@ -35,7 +44,13 @@ namespace broan {
 
 #define FILTER_LIFE_MAX 7884000
 
+// Diagnostic register scanner — enable via platformio_options build_flags, e.g.:
+//   -DSCAN_UNKNOWN=1     brute-force read every register, log the unmapped ones
+//   -DDUMP_GROUP=0x50    ALSO PINS the sweep to that one group, logging every value
+//                        each pass (change detection in other groups is off while set)
+// Left off by default so production configs stay clean.
 //#define SCAN_UNKNOWN 1
+//#define DUMP_GROUP 0x22
 //#define LISTEN_ONLY 1
 
 template<typename T>
@@ -49,13 +64,6 @@ enum BroanFieldType
 	Int,
 	Byte,
 	Void,
-};
-
-enum BroanCFMMode
-{
-	Input = 1 >> 0,
-	Output = 1 >> 1,
-	Both = BroanCFMMode::Input | BroanCFMMode::Output,
 };
 
 enum BroanFanMode
@@ -109,9 +117,46 @@ enum BroanField
 	FilterReset, // Set to 1 to reset
 	FilterLife, // default 7884000 / 3 months
 
-	// Unknown fields that look interesting but aren't understood nor read by controllers
-	UnknownA,
-	UnknownB,
+	// 08 E0 / 09 E0 — airstream humidity (decoded 2026-07-01: jump ~9 pts when
+	// airflow starts, collapse together to house RH when fans stop). 08E0 leads,
+	// so it's the likely intake side in summer; intake/exhaust split provisional.
+	UnknownA,   // 08 E0 — humidity (provisional: intake)
+	UnknownB,   // 09 E0 — humidity (provisional: exhaust)
+
+	// Added via ESP-side register scan (2026-07-01)
+	FilterInterval, // 09 30 — configured filter life in seconds (120 days default)
+	Firmware,       // 02 00 — ASCII app name ("am_main")
+	Model,          // 02 60 — ASCII model code ("AM1G4")
+	FirmwareVersion,// 01 00 — 3-byte major.minor.patch (next to "am_main")
+	HardwareRev,    // 01 60 — 3-byte major.minor.patch (next to "AM1G4")
+	OverrideDuration, // 01 22 — override (OVR) length in seconds (1200 = "OVR 20M")
+	UnknownC,       // 07 E0 — PCBA (board) thermistor (~32 C; E42/W61 in service manual)
+
+	// Read-only diagnostic from upstream's VTSPEEDW scan (added 2026-07-01)
+	FaultCode,      // 17 00 — fault/error code; idles 0xFFFFFFFF (all-ones) = no fault
+
+	// Warning register, CONFIRMED 2026-07-01 by forced W22+W32: showed 22 then
+	// alternated 22<->32 while both airflow warnings were active (the register
+	// cycles through concurrent warnings). Idles 0xFFFFFFFF like FaultCode.
+	// (12 00 also idles all-ones but did NOT react — role unknown, not polled.)
+	WarningCode,    // 1A 00 — active W code; idles 0xFFFFFFFF = no warning
+
+	// Decoded 2026-07-02 by mode-cycling with HA history:
+	//  02 20 = BASE fan mode (BroanFanMode enum value). Tracks off/min/max/int
+	//          but NOT turbo — turbo is an overlay; this is the mode the unit
+	//          falls back to when it expires.
+	//  07 20 = EXECUTING airflow state: 0 = fans idle, nonzero = air actually
+	//          moving, value encodes the running profile (2=max, 3=turbo,
+	//          4=int-venting; min/smart/recirc values TBD — see
+	//          decodeBroanActiveMode). THE fans-running indicator: during a
+	//          60 s "min" test the fans never spun and it correctly stayed 0.
+	//  (01 20 was a mode-CHANGE pulse — flashed the new mode enum for one poll
+	//  then returned to 0. Event register, no lasting state; dropped.)
+	// Both legitimately read 0, so their m_value is seeded 0xFF below —
+	// otherwise the oldVal==newVal change-gate swallows the first publish
+	// (the bug that faked out the old 08 20 "DamperState" entity).
+	BaseModeCode,
+	ActiveModeCode,
 
 	MAX_FIELDS,
 };
@@ -163,6 +208,28 @@ class BroanComponent : public Component, public uart::UARTDevice
 	SUB_SENSOR(exhaust_cfm)
 	SUB_SENSOR(supply_rpm)
 	SUB_SENSOR(exhaust_rpm)
+	SUB_SENSOR(uptime)
+	SUB_SENSOR(aux_07e0)
+	SUB_SENSOR(aux_08e0)
+	SUB_SENSOR(aux_09e0)
+	SUB_SENSOR(fault_code)
+	SUB_SENSOR(warning_code)
+	SUB_SENSOR(base_mode_code)
+	SUB_SENSOR(active_mode_code)
+#endif
+
+#ifdef USE_TEXT_SENSOR
+	SUB_TEXT_SENSOR(model)
+	SUB_TEXT_SENSOR(firmware)
+	SUB_TEXT_SENSOR(firmware_version)
+	SUB_TEXT_SENSOR(hardware_rev)
+	SUB_TEXT_SENSOR(fault_status)
+	SUB_TEXT_SENSOR(warning_status)
+	SUB_TEXT_SENSOR(active_mode)
+#endif
+
+#ifdef USE_BINARY_SENSOR
+	SUB_BINARY_SENSOR(fans_running)
 #endif
 
 #ifdef USE_SELECT
@@ -173,6 +240,8 @@ class BroanComponent : public Component, public uart::UARTDevice
 	SUB_NUMBER(fan_speed)
 	SUB_NUMBER(humidity_setpoint)
 	SUB_NUMBER(intermittent_period)
+	SUB_NUMBER(filter_interval)
+	SUB_NUMBER(override_duration)
 #endif
 
 #ifdef USE_BUTTON
@@ -227,9 +296,25 @@ public:
 		{ 0x08, 0x30, BroanFieldType::Int, {0}, UPDATE_RATE_SLOW }, // Number of seconds until filter needs reset. Set along side reset byte
 
 
-		// Interesting fields found by scan
-		{ 0x08, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_NEVER }, // Unknown. Seems to change a lot. 38.943115 / 1109116352 (Does not correlate with fan speed)
-		{ 0x09, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_NEVER }, // Unknown. Seems to change a lot. 36.360962 / 1108439456 (Same as above)
+		// Interesting fields found by scan (07/08/09 E0 decoded 2026-07-01)
+		{ 0x08, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // UnknownA — airstream humidity (provisional: intake)
+		{ 0x09, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // UnknownB — airstream humidity (provisional: exhaust)
+
+		// Added via ESP-side register scan (2026-07-01). Order matches the enum.
+		{ 0x09, 0x30, BroanFieldType::Int,   {0}, UPDATE_RATE_SLOW }, // FilterInterval — configured filter life (seconds)
+		{ 0x02, 0x00, BroanFieldType::Void,  {0}, UPDATE_RATE_SLOW }, // Firmware — ASCII string, handled specially
+		{ 0x02, 0x60, BroanFieldType::Void,  {0}, UPDATE_RATE_SLOW }, // Model    — ASCII string, handled specially
+		{ 0x01, 0x00, BroanFieldType::Void,  {0}, UPDATE_RATE_SLOW }, // FirmwareVersion — 3-byte version, handled specially
+		{ 0x01, 0x60, BroanFieldType::Void,  {0}, UPDATE_RATE_SLOW }, // HardwareRev     — 3-byte version, handled specially
+		{ 0x01, 0x22, BroanFieldType::Int,   {0}, UPDATE_RATE_SLOW }, // OverrideDuration — OVR length (seconds)
+		{ 0x07, 0xE0, BroanFieldType::Float, {0}, UPDATE_RATE_FAST }, // UnknownC (07E0) — PCBA board thermistor (~32 C; E42/W61)
+		{ 0x17, 0x00, BroanFieldType::Int,   {0}, UPDATE_RATE_SLOW }, // FaultCode — 0xFFFFFFFF = no fault
+		{ 0x1A, 0x00, BroanFieldType::Int,   {0}, UPDATE_RATE_FAST }, // WarningCode — cycles through active W codes; 0xFFFFFFFF = none. FAST: warnings are transient
+
+		// Seeded 0xFF (not {0}) so the first read — legitimately 0 — differs
+		// from the initial value and publishes past the change-gate.
+		{ 0x02, 0x20, BroanFieldType::Byte, {{'\xFF','\xFF','\xFF','\xFF'}}, UPDATE_RATE_FAST }, // BaseModeCode — BroanFanMode enum; excludes turbo overlay
+		{ 0x07, 0x20, BroanFieldType::Byte, {{'\xFF','\xFF','\xFF','\xFF'}}, UPDATE_RATE_FAST }, // ActiveModeCode — 0 = fans idle; nonzero = running profile
 
 /*
 		// Unknown fields scanned by the VTSPEEDW
@@ -251,8 +336,9 @@ public:
 		{ 0x00, 0x22, BroanFieldType::Int, {0} }, // Unknown. 14400 / 40380000
 		{ 0x07, 0x50, BroanFieldType::Int, {0} }, // Unknown. VTSPEEDW often sets this to -1
 		{ 0x03, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering INT mode
-		{ 0x08, 0x20, BroanFieldType::Byte, {0} }, // Unknown. Set to 0 when entering SMART mode, set to 1 in continuous modes.
+		{ 0x08, 0x20, BroanFieldType::Byte, {0} }, // Controller WRITE-target only: 0 entering SMART, 1 in continuous modes. Reads never answered on AM1G4 (tried 2026-07-01) — don't promote as a sensor.
 */
+	// NB: 17 00 above was promoted to FaultCode (2026-07-01).
 	};
 
 	// uart overrides
@@ -265,15 +351,40 @@ public:
 	// Setup
 	void set_flow_control_pin(GPIOPin *flow_control_pin) { this->flow_control_pin_ = flow_control_pin; }
 
-	// Control API
+	// Control API. Setters return false when the write was dropped (send queue
+	// full) so callers know not to optimistically publish a value never sent.
 	void setFanMode( std::string mode );
 	void setFanSpeed( float speed );
-	void setFanSpeedCFM( BroanFanMode mode, BroanCFMMode direction, float flTargetCFM );
 	void resetFilter();
 	void setHumidityControl( bool enable );
 	void setHumiditySetpoint( float humidity );
 	void setCurrentHumidity( float humidity );
 	void setIntermittentPeriod( uint32_t period );
+	bool setFilterInterval( uint32_t days );
+	bool setOverrideDuration( uint32_t minutes );
+
+	// Write a single CFM setpoint field (by BroanField index) — enables
+	// independent supply/exhaust (balanced/unbalanced) control per speed.
+	bool setCFM( uint32_t field, float cfm );
+
+	// RE/debug: write one raw byte to an arbitrary register (doesn't need to be
+	// in m_vecFields). Used from scan-build template numbers to poke candidate
+	// registers (e.g. the 0D22/0E22 per-mode speed-selector hunt, 2026-07-02).
+	bool pokeByteRegister( uint8_t opcodeHigh, uint8_t opcodeLow, uint8_t value )
+	{
+		BroanField_t f = { opcodeHigh, opcodeLow, BroanFieldType::Byte, {0}, 0 };
+		f.m_value.m_chValue = value;
+		ESP_LOGW( "broan", "POKE %02X%02X <= %u", opcodeHigh, opcodeLow, value );
+		return writeRegisters( { f } );
+	}
+#ifdef USE_NUMBER
+	// Called from codegen so we can push the current value back to the entity.
+	void register_cfm_number( uint32_t field, number::Number *n ) { cfm_numbers_[field] = n; }
+#endif
+
+	// Record that we just wrote `raw` (4-byte union value) to `field`, so the
+	// parser ignores stale read-backs until the field reflects it (or ~5s).
+	void notePendingWrite( uint32_t field, uint32_t raw ) { m_pendingWrites[field] = { raw, (uint32_t)(millis() + 5000) }; }
 
 private:
 
@@ -290,7 +401,7 @@ private:
 	std::map<uint16_t, BroanField_t> m_vecFieldData;
 #endif
 
-	std::vector<uint8_t> m_vecHeader;
+	uint8_t m_vecHeader[5] = {0};
 	bool m_bHaveHeader = false;
 
 	bool m_bHaveControl = false;
@@ -310,7 +421,13 @@ private:
 	void replyIfAllowed();
 	void runTasks();
 	void parseBroanFields(const std::vector<uint8_t>& message);
-	void writeRegisters( const std::vector<BroanField_t> &values );
+	bool writeRegisters( const std::vector<BroanField_t> &values );
+
+#ifdef USE_NUMBER
+	// Recompute + publish the Fan Speed % from CFMIn_Medium against the
+	// CFMIn_Min/Max range; no-op until all three registers hold sane values.
+	void publishFanSpeed();
+#endif
 
 	float remap(float flIn, float flInMin, float flInMax, float flOutMin, float flOutMax) {
   		return (flIn - flInMin) * (flOutMax - flOutMin) / (flInMax - flInMin) + flOutMin;
@@ -320,7 +437,7 @@ private:
 	uint32_t lookupFieldIndex( uint8_t opcodeHigh, uint8_t opcodeLow );
 	void handleUnknownField(uint32_t nOpcodeHigh, uint32_t nOpcodeLow, uint8_t len, uint32_t i, const std::vector<uint8_t>& message );
 
-	void queueMessage(std::vector<uint8_t>& message);
+	bool queueMessage(std::vector<uint8_t>& message);
 
 
 protected:
@@ -339,6 +456,13 @@ protected:
 	uint32_t filter_life_{0};
 
 	GPIOPin *flow_control_pin_{nullptr};
+
+#ifdef USE_NUMBER
+	std::map<uint32_t, number::Number*> cfm_numbers_;
+#endif
+
+	struct PendingWrite { uint32_t value; uint32_t expiry; };
+	std::map<uint32_t, PendingWrite> m_pendingWrites;
 };
 
 }  // namespace broan

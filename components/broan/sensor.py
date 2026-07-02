@@ -5,16 +5,31 @@ from esphome.const import (
     CONF_POWER,
     CONF_TEMPERATURE,
     DEVICE_CLASS_POWER ,
+    DEVICE_CLASS_DURATION,
+    DEVICE_CLASS_HUMIDITY,
     ENTITY_CATEGORY_DIAGNOSTIC,
     DEVICE_CLASS_TEMPERATURE,
     ICON_POWER,
     ICON_THERMOMETER,
     ICON_AIR_FILTER,
     ICON_FAN,
+    ICON_TIMER,
+    STATE_CLASS_MEASUREMENT,
+    STATE_CLASS_TOTAL_INCREASING,
     UNIT_WATT,
     UNIT_CELSIUS,
+    UNIT_PERCENT,
+    UNIT_SECOND,
 )
 
+CONF_UPTIME = "uptime"
+CONF_AUX_07E0 = "aux_07e0"
+CONF_AUX_08E0 = "aux_08e0"
+CONF_AUX_09E0 = "aux_09e0"
+CONF_FAULT_CODE = "fault_code"
+CONF_WARNING_CODE = "warning_code"
+CONF_BASE_MODE_CODE = "base_mode_code"
+CONF_ACTIVE_MODE_CODE = "active_mode_code"
 CONF_FILTER_LIFE = "filter_life"
 CONF_TEMPERATURE_OUT = "temperature_out"
 CONF_SUPPLY_CFM = "supply_fan_cfm"
@@ -68,6 +83,64 @@ CONFIG_SCHEMA = cv.Schema(
             icon=ICON_FAN,
             unit_of_measurement=UNIT_RPM,
         ),
+        cv.Optional(CONF_UPTIME): sensor.sensor_schema(
+            icon=ICON_TIMER,
+            unit_of_measurement=UNIT_SECOND,
+            device_class=DEVICE_CLASS_DURATION,
+            state_class=STATE_CLASS_TOTAL_INCREASING,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        # 0xE0 environment fields decoded 2026-07-01 via the fan on/off transient:
+        # 07E0 stays flat when airflow starts/stops -> temperature (~32 C, core).
+        cv.Optional(CONF_AUX_07E0): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            icon=ICON_THERMOMETER,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        # 08E0 / 09E0 jump with airflow -> airstream humidity. Intake vs exhaust
+        # split still provisional (08E0 leads); confirm on a moisture event.
+        cv.Optional(CONF_AUX_08E0): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_HUMIDITY,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_AUX_09E0): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_HUMIDITY,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        # Fault register (17 00). Idles at 0xFFFFFFFF on the wire (= no fault),
+        # published as 0; a real fault holds an E/W code number (decoded to text
+        # by the fault_status text_sensor). Kept for verifying the encoding.
+        cv.Optional(CONF_FAULT_CODE): sensor.sensor_schema(
+            accuracy_decimals=0,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        # Warning register (1A 00), confirmed 2026-07-01 by forced W22/W32.
+        # Idles 0xFFFFFFFF, published 0; cycles through concurrent warnings.
+        # Decoded text lives on the warning_status text_sensor.
+        cv.Optional(CONF_WARNING_CODE): sensor.sensor_schema(
+            accuracy_decimals=0,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        # 02 20: base fan mode as the raw BroanFanMode enum value — the mode the
+        # unit falls back to after a turbo/ovr overlay (turbo doesn't change it).
+        cv.Optional(CONF_BASE_MODE_CODE): sensor.sensor_schema(
+            accuracy_decimals=0,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        # 07 20: executing airflow state (decoded 2026-07-02). 0 = fans idle,
+        # nonzero = air moving; 2=max, 3=turbo, 4=int-venting (min/smart/recirc
+        # TBD). Feeds the fans_running binary_sensor + active_mode text_sensor;
+        # this raw code stays to capture the not-yet-mapped values.
+        cv.Optional(CONF_ACTIVE_MODE_CODE): sensor.sensor_schema(
+            accuracy_decimals=0,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
     }
 )
 
@@ -104,3 +177,35 @@ async def to_code(config):
     if exhaust_rpm_config := config.get(CONF_EXHAUST_RPM):
         sens = await sensor.new_sensor(exhaust_rpm_config)
         cg.add(broan_component.set_exhaust_rpm_sensor(sens))
+
+    if uptime_config := config.get(CONF_UPTIME):
+        sens = await sensor.new_sensor(uptime_config)
+        cg.add(broan_component.set_uptime_sensor(sens))
+
+    if aux_07e0_config := config.get(CONF_AUX_07E0):
+        sens = await sensor.new_sensor(aux_07e0_config)
+        cg.add(broan_component.set_aux_07e0_sensor(sens))
+
+    if aux_08e0_config := config.get(CONF_AUX_08E0):
+        sens = await sensor.new_sensor(aux_08e0_config)
+        cg.add(broan_component.set_aux_08e0_sensor(sens))
+
+    if aux_09e0_config := config.get(CONF_AUX_09E0):
+        sens = await sensor.new_sensor(aux_09e0_config)
+        cg.add(broan_component.set_aux_09e0_sensor(sens))
+
+    if fault_code_config := config.get(CONF_FAULT_CODE):
+        sens = await sensor.new_sensor(fault_code_config)
+        cg.add(broan_component.set_fault_code_sensor(sens))
+
+    if warning_code_config := config.get(CONF_WARNING_CODE):
+        sens = await sensor.new_sensor(warning_code_config)
+        cg.add(broan_component.set_warning_code_sensor(sens))
+
+    if base_mode_code_config := config.get(CONF_BASE_MODE_CODE):
+        sens = await sensor.new_sensor(base_mode_code_config)
+        cg.add(broan_component.set_base_mode_code_sensor(sens))
+
+    if active_mode_code_config := config.get(CONF_ACTIVE_MODE_CODE):
+        sens = await sensor.new_sensor(active_mode_code_config)
+        cg.add(broan_component.set_active_mode_code_sensor(sens))

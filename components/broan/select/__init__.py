@@ -38,6 +38,8 @@ async def to_code(config):
                 "humidity",
                 "recirculate",
 				"ovr",
+                "smart",
+                "away",
             ],
         )
         await cg.register_parented(s, config[CONF_BROAN_ID])
