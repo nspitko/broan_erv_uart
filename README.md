@@ -35,12 +35,18 @@ Some rs485 trancevers have a jumper for the terminating resistor, some do not. I
 Also be aware some RS485 devices will label their pins A and B instead of D+ and D-. Somewhat confusingly, A is D- and B is D+
 
 ## Supported features
-* Setting fan mode (Standby, Min, Max, Intermittent, Turbo, Override, and Med, which is treated as manual control)
+* Setting fan mode (Standby, Min, Max, Intermittent, Turbo, Smart, Away, and Med, which is treated as manual control)
 * Setting fan speed in manual mode
-* Humidity control mode
-* Intake temperature
-* Filter life left
-* Fan CFM 
+* Per-speed supply/exhaust CFM setpoints (balanced/unbalanced ventilation)
+* Humidity control mode (setpoint + current-humidity feed)
+* Intake temperature, airstream humidity, and electronics (PCBA) temperature
+* Filter life left, filter interval, and filter reset
+* Fan CFM and RPM
+* Fans Running binary sensor + executing-mode sensor (distinguishes an intermittent
+  off-window from actual venting)
+* Fault and warning registers, decoded to the service-manual E/W code descriptions
+* Model, firmware name/version, and hardware revision
+* Intermittent period and override (OVR) duration
 
 More features will be added as time allows. I've documented many fields that aren't supported yet. If there's a specific feature you want prioritized, open an issue. This project is at a point where it "works for me" so I don't have a lot of guiding light on what else should be added without external input.
 

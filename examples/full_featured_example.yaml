@@ -1,0 +1,92 @@
+# Kitchen-sink example: every entity the component offers, in one config.
+# Remove anything your unit does not support. Tested on a Broan AM1G4.
+# (Wifi/api/ota config trimmed — use your usual blocks.)
+esphome:
+  name: erv
+
+esp32:
+  board: m5stack-atoms3
+  variant: esp32s3
+  framework:
+    type: esp-idf
+
+logger:
+api:
+wifi:
+  ssid: "dummy"
+  password: "dummy12345"
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/nspitko/broan_erv_uart
+    components: [ broan ]
+
+uart:
+  id: rs485
+  tx_pin: GPIO6
+  rx_pin: GPIO5
+  baud_rate: 38400
+
+broan:
+  uart_id: rs485
+  id: mybroan
+
+select:
+  - platform: broan
+    fan_mode: { name: "Fan Mode" }
+
+number:
+  - platform: broan
+    fan_speed: { name: "Fan Speed" }
+    intermittent_period: { name: "Intermittent Period" }
+    humidity_setpoint: { name: "Humidity Setpoint" }
+    filter_interval: { name: "Filter Interval" }
+    override_duration: { name: "Override Duration" }
+    cfm_min_supply: { name: "CFM Min Supply" }
+    cfm_min_exhaust: { name: "CFM Min Exhaust" }
+    cfm_med_supply: { name: "CFM Med Supply" }
+    cfm_med_exhaust: { name: "CFM Med Exhaust" }
+    cfm_max_supply: { name: "CFM Max Supply" }
+    cfm_max_exhaust: { name: "CFM Max Exhaust" }
+
+switch:
+  - platform: broan
+    humidity_control: { name: "Humidity Control" }
+
+sensor:
+  - platform: broan
+    power: { name: "Power Draw" }
+    temperature: { name: "Intake Temperature" }
+    temperature_out: { name: "Exhaust Temperature" }
+    filter_life: { name: "Remaining Filter Life" }
+    supply_fan_cfm: { name: "Supply Fan CFM" }
+    exhaust_fan_cfm: { name: "Exhaust Fan CFM" }
+    supply_fan_rpm: { name: "Supply Fan RPM" }
+    exhaust_fan_rpm: { name: "Exhaust Fan RPM" }
+    uptime: { name: "Uptime" }
+    aux_07e0: { name: "Electronics Temperature" }
+    aux_08e0: { name: "Intake Humidity" }
+    aux_09e0: { name: "Exhaust Humidity" }
+    fault_code: { name: "Fault Code" }
+    warning_code: { name: "Warning Code" }
+    base_mode_code: { name: "Base Mode Code" }
+    active_mode_code: { name: "Active Mode Code" }
+
+binary_sensor:
+  - platform: broan
+    fans_running: { name: "Fans Running" }
+
+text_sensor:
+  - platform: broan
+    model: { name: "Model" }
+    firmware: { name: "Firmware" }
+    firmware_version: { name: "Firmware Version" }
+    hardware_rev: { name: "Hardware Rev" }
+    fault_status: { name: "Fault Status" }
+    warning_status: { name: "Warning Status" }
+    active_mode: { name: "Active Mode" }
+
+button:
+  - platform: broan
+    filter_reset: { name: "Filter Reset" }
