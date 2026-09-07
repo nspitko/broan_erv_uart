@@ -5,6 +5,7 @@ from esphome.const import (
     CONF_POWER,
     CONF_TEMPERATURE,
     DEVICE_CLASS_POWER ,
+    DEVICE_CLASS_HUMIDITY,
     ENTITY_CATEGORY_DIAGNOSTIC,
     DEVICE_CLASS_TEMPERATURE,
     ICON_POWER,
@@ -13,10 +14,13 @@ from esphome.const import (
     ICON_FAN,
     UNIT_WATT,
     UNIT_CELSIUS,
+    UNIT_PERCENT,
 )
 
 CONF_FILTER_LIFE = "filter_life"
 CONF_TEMPERATURE_OUT = "temperature_out"
+CONF_HUMIDITY_IN = "humidity_in"
+CONF_HUMIDITY_OUT = "humidity_out"
 CONF_SUPPLY_CFM = "supply_fan_cfm"
 CONF_EXHAUST_CFM = "exhaust_fan_cfm"
 CONF_SUPPLY_RPM = "supply_fan_rpm"
@@ -51,6 +55,14 @@ CONFIG_SCHEMA = cv.Schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             icon=ICON_THERMOMETER,
             unit_of_measurement=UNIT_CELSIUS,
+        ),
+        cv.Optional(CONF_HUMIDITY_IN): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_HUMIDITY,
+            unit_of_measurement=UNIT_PERCENT,
+        ),
+        cv.Optional(CONF_HUMIDITY_OUT): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_HUMIDITY,
+            unit_of_measurement=UNIT_PERCENT,
         ),
         cv.Optional(CONF_FILTER_LIFE): sensor.sensor_schema(
             icon=ICON_AIR_FILTER,
@@ -105,6 +117,14 @@ async def to_code(config):
     if temperature_out_config := config.get(CONF_TEMPERATURE_OUT):
         sens = await sensor.new_sensor(temperature_out_config)
         cg.add(broan_component.set_temperature_out_sensor(sens))
+
+    if humidity_in_config := config.get(CONF_HUMIDITY_IN):
+        sens = await sensor.new_sensor(humidity_in_config)
+        cg.add(broan_component.set_humidity_in_sensor(sens))
+
+    if humidity_out_config := config.get(CONF_HUMIDITY_OUT):
+        sens = await sensor.new_sensor(humidity_out_config)
+        cg.add(broan_component.set_humidity_out_sensor(sens))
 
     if filter_life_config := config.get(CONF_FILTER_LIFE):
         sens = await sensor.new_sensor(filter_life_config)

@@ -450,6 +450,20 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 			}
 			break;
 
+			case BroanField::HumidityIn:
+				if( !humidity_in_sensor_ )
+					continue;
+
+				humidity_in_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+
+			case BroanField::HumidityOut:
+				if( !humidity_out_sensor_ )
+					continue;
+
+				humidity_out_sensor_->publish_state(pField->m_value.m_flValue);
+			break;
+
 #endif	
 #ifdef USE_NUMBER
 			case BroanField::TargetHumidityA:
