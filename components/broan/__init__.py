@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal  # noqa: F401 used in child components
 
 from esphome import pins
 import esphome.codegen as cg
 from esphome.components import uart
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_FLOW_CONTROL_PIN
+from esphome.const import CONF_FLOW_CONTROL_PIN, CONF_ID
 from esphome.cpp_helpers import gpio_pin_expression
 
 AUTO_LOAD = []
@@ -42,6 +42,7 @@ FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
     parity="NONE",
     stop_bits=1,
 )
+
 
 async def to_code(config):
     cg.add_global(broan_ns.using)

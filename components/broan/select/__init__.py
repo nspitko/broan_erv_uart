@@ -1,20 +1,16 @@
 import esphome.codegen as cg
 from esphome.components import select
 import esphome.config_validation as cv
-from esphome.const import (
-    ENTITY_CATEGORY_CONFIG,
-    ICON_GAUGE,
-)
+from esphome.const import ENTITY_CATEGORY_CONFIG, ICON_GAUGE
 
 from .. import CONF_BROAN_ID, BroanComponent, broan_ns
 
 FanModeSelect = broan_ns.class_("FanModeSelect", select.Select)
 
-CONF_FAN_MODE = 'fan_mode'
+CONF_FAN_MODE = "fan_mode"
 
 CONFIG_SCHEMA = {
     cv.GenerateID(CONF_BROAN_ID): cv.use_id(BroanComponent),
-
     cv.Optional(CONF_FAN_MODE): select.select_schema(
         FanModeSelect,
         entity_category=ENTITY_CATEGORY_CONFIG,
@@ -38,7 +34,7 @@ async def to_code(config):
                 "humidity",
                 "recirculate",
                 "smart",
-				"ovr",
+                "ovr",
             ],
         )
         await cg.register_parented(s, config[CONF_BROAN_ID])

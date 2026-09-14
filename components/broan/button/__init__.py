@@ -1,10 +1,7 @@
 import esphome.codegen as cg
 from esphome.components import button
 import esphome.config_validation as cv
-from esphome.const import (
-    ENTITY_CATEGORY_CONFIG,
-    ICON_RESTART,
-)
+from esphome.const import ENTITY_CATEGORY_CONFIG, ICON_RESTART
 
 from .. import CONF_BROAN_ID, BroanComponent, broan_ns
 

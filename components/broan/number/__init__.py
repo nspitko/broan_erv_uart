@@ -2,20 +2,21 @@ import esphome.codegen as cg
 from esphome.components import number
 import esphome.config_validation as cv
 from esphome.const import (
-    CONF_ID,
-    DEVICE_CLASS_SPEED,
+    CONF_ID as CONF_ID,
     DEVICE_CLASS_HUMIDITY,
+    DEVICE_CLASS_SPEED,
     ENTITY_CATEGORY_CONFIG,
     ICON_FAN,
-    ICON_WATER,
     ICON_TIMER,
+    ICON_WATER,
     UNIT_PERCENT,
 )
+
+from .. import CONF_BROAN_ID, BroanComponent, broan_ns
 
 UNIT_CFM = "CFM"
 UNIT_PERIOD = "Period"
 
-from .. import CONF_BROAN_ID, BroanComponent, broan_ns
 
 FanSpeedNumber = broan_ns.class_("FanSpeedNumber", number.Number)
 HumiditySetpointNumber = broan_ns.class_("HumiditySetpointNumber", number.Number)
@@ -32,7 +33,7 @@ CONFIG_SCHEMA = cv.Schema(
             FanSpeedNumber,
             device_class=DEVICE_CLASS_SPEED,
             entity_category=ENTITY_CATEGORY_CONFIG,
-			unit_of_measurement=UNIT_PERCENT,
+            unit_of_measurement=UNIT_PERCENT,
             icon=ICON_FAN,
         ),
         cv.Optional(CONF_HUMIDITY_SETPOINT): number.number_schema(
@@ -47,7 +48,7 @@ CONFIG_SCHEMA = cv.Schema(
             entity_category=ENTITY_CATEGORY_CONFIG,
             unit_of_measurement=UNIT_PERIOD,
             icon=ICON_TIMER,
-        )
+        ),
     }
 )
 

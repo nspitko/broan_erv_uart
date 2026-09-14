@@ -3,10 +3,7 @@
 namespace esphome {
 namespace broan {
 
-void FilterResetButton::press_action()
-{
-	this->parent_->resetFilter();
-}
+void FilterResetButton::press_action() { this->parent_->resetFilter(); }
 
 }  // namespace broan
 }  // namespace esphome

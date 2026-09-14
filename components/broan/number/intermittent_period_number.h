@@ -11,7 +11,7 @@ namespace broan {
 class IntermittentPeriodNumber : public number::Number, public Parented<BroanComponent> {
  public:
   IntermittentPeriodNumber() = default;
-  
+
  protected:
   void control(float value) override;
 };
