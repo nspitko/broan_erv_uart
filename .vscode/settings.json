@@ -1,3 +1,9 @@
 {
+    "C_Cpp.default.compileCommands": [
+        "${workspaceFolder}/.esphome/build/broan-erv/compile_commands.json"
+    ],
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/.esphome/build/broan-erv/src/**"
+    ],
     "C_Cpp.default.cppStandard": "c++20"
 }

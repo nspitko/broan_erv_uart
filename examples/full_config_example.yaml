@@ -1,0 +1,40 @@
+esphome:
+  name: broan-erv
+
+esp32:
+  variant: esp32s3
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [broan]
+
+uart:
+  id: rs485
+  tx_pin: GPIO17
+  rx_pin: GPIO18
+  baud_rate: 38400
+  rx_buffer_size: 2048
+
+broan:
+  uart_id: rs485
+
+select:
+  - platform: broan
+    fan_mode:
+      name: "fan mode"
+
+number:
+  - platform: broan
+    fan_speed:
+      name: "fan speed"
+
+sensor:
+  - platform: broan
+    power:
+      name: Power draw
+    temperature:
+      name: Temperature

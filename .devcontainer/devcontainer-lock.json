@@ -1,0 +1,19 @@
+{
+  "features": {
+    "ghcr.io/devcontainer-community/devcontainer-features/astral.sh-uv:1": {
+      "version": "1.0.6",
+      "resolved": "ghcr.io/devcontainer-community/devcontainer-features/astral.sh-uv@sha256:36f95b90080248a05aba7b1b3cecf8018bb6d7222f6274f03f050b502abd4fe7",
+      "integrity": "sha256:36f95b90080248a05aba7b1b3cecf8018bb6d7222f6274f03f050b502abd4fe7"
+    },
+    "ghcr.io/devcontainers-extra/features/apt-packages:1": {
+      "version": "1.0.6",
+      "resolved": "ghcr.io/devcontainers-extra/features/apt-packages@sha256:55c54412112da81b9381e470cdbbe55278564950d1ff536ce925b1e8e096babd",
+      "integrity": "sha256:55c54412112da81b9381e470cdbbe55278564950d1ff536ce925b1e8e096babd"
+    },
+    "ghcr.io/devcontainers-extra/features/prek:1": {
+      "version": "1.0.0",
+      "resolved": "ghcr.io/devcontainers-extra/features/prek@sha256:eb55e266252d8560cf726f27c5675e397bb833067a21428c50b273a59842f649",
+      "integrity": "sha256:eb55e266252d8560cf726f27c5675e397bb833067a21428c50b273a59842f649"
+    }
+  }
+}
