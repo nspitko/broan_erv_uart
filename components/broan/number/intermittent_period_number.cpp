@@ -3,10 +3,7 @@
 namespace esphome {
 namespace broan {
 
-void IntermittentPeriodNumber::control(float value)
-{
-	this->parent_->setIntermittentPeriod( value );
-}
+void IntermittentPeriodNumber::control(float value) { this->parent_->setIntermittentPeriod(value); }
 
 }  // namespace broan
 }  // namespace esphome

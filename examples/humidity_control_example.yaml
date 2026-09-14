@@ -3,11 +3,11 @@ external_components:
       type: git
       url: https://github.com/nspitko/broan_erv_uart
       ref: main
-    components: [ broan ]
+    components: [broan]
 
 uart:
   id: rs485
-  tx_pin: GPIO17 # Change these to match your rs485 tranceiver. 17/18 is txd1/rxd1
+  tx_pin: GPIO17  # Change these to match your rs485 tranceiver. 17/18 is txd1/rxd1
   rx_pin: GPIO18
   baud_rate: 38400
   rx_buffer_size: 2048
@@ -57,7 +57,7 @@ sensor:
     name: "Home Assistant Humidity"
     internal: true
     entity_id: sensor.main_thermostat_current_humidity
-    on_value:                    # when we get an update, send to the ERV 
+    on_value:                    # when we get an update, send to the ERV
       then:                      # if humidty control mode is on
         lambda: |-
           if (id(humcontrol).state) {
@@ -67,5 +67,3 @@ button:
   - platform: broan
     filter_reset:
       name: Filter Reset
-
-

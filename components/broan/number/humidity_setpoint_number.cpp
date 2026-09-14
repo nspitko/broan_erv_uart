@@ -3,10 +3,7 @@
 namespace esphome {
 namespace broan {
 
-void HumiditySetpointNumber::control(float value)
-{
-	this->parent_->setHumiditySetpoint( value );
-}
+void HumiditySetpointNumber::control(float value) { this->parent_->setHumiditySetpoint(value); }
 
 }  // namespace broan
 }  // namespace esphome

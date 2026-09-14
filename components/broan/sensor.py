@@ -4,16 +4,18 @@ import esphome.config_validation as cv
 from esphome.const import (
     CONF_POWER,
     CONF_TEMPERATURE,
-    DEVICE_CLASS_POWER ,
-    ENTITY_CATEGORY_DIAGNOSTIC,
+    DEVICE_CLASS_POWER,
     DEVICE_CLASS_TEMPERATURE,
-    ICON_POWER,
-    ICON_THERMOMETER,
+    ENTITY_CATEGORY_DIAGNOSTIC,
     ICON_AIR_FILTER,
     ICON_FAN,
-    UNIT_WATT,
+    ICON_POWER,
+    ICON_THERMOMETER,
     UNIT_CELSIUS,
+    UNIT_WATT,
 )
+
+from . import CONF_BROAN_ID, BroanComponent
 
 CONF_FILTER_LIFE = "filter_life"
 CONF_TEMPERATURE_OUT = "temperature_out"
@@ -30,7 +32,6 @@ UNIT_CFM = "CFM"
 UNIT_RPM = "RPM"
 UNIT_DAY = "d"
 
-from . import CONF_BROAN_ID, BroanComponent
 
 DEPENDENCIES = ["broan"]
 
@@ -72,25 +73,22 @@ CONFIG_SCHEMA = cv.Schema(
             icon=ICON_FAN,
             unit_of_measurement=UNIT_RPM,
         ),
-
         # Info / Diagnostic
         cv.Optional(CONF_FAULT_CODE): sensor.sensor_schema(
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
-
         cv.Optional(CONF_WARNING_CODE): sensor.sensor_schema(
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
-
         cv.Optional(CONF_BASE_MODE_CODE): sensor.sensor_schema(
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
-
         cv.Optional(CONF_ACTIVE_MODE_CODE): sensor.sensor_schema(
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
     }
 )
+
 
 async def to_code(config):
     broan_component = await cg.get_variable(config[CONF_BROAN_ID])

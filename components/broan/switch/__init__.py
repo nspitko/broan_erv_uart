@@ -1,11 +1,7 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import switch
-from esphome.const import (
-    CONF_ID,
-    ENTITY_CATEGORY_CONFIG,
-    ICON_WATER,
-)
+import esphome.config_validation as cv
+from esphome.const import CONF_ID as CONF_ID, ENTITY_CATEGORY_CONFIG, ICON_WATER
 
 from .. import CONF_BROAN_ID, BroanComponent, broan_ns
 
