@@ -533,7 +533,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 					break;
 				}
 				
-				char buf[6];
+				char buf[12];
 				snprintf( buf, sizeof(buf), "W%u", pField->m_value.m_nValue );
 
 				warning_code_text_sensor_->publish_state(buf);
@@ -550,7 +550,7 @@ void BroanComponent::parseBroanFields(const std::vector<uint8_t>& message)
 					break;
 				}
 				
-				char buf[6];
+				char buf[12];
 				snprintf( buf, sizeof(buf), "E%u", pField->m_value.m_nValue );
 
 				fault_code_text_sensor_->publish_state(buf);
