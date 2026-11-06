@@ -2,10 +2,23 @@
 
 #include "esphome.h"
 #include <deque>
+#include <map>
 #include "esphome/core/component.h"
 
 #ifdef USE_SELECT
 #include "esphome/components/select/select.h"
+#endif
+
+#ifdef USE_SENSOR
+#include "esphome/components/sensor/sensor.h"
+#endif
+
+#ifdef USE_NUMBER
+#include "esphome/components/number/number.h"
+#endif
+
+#ifdef USE_TEXT_SENSOR
+#include "esphome/components/text_sensor/text_sensor.h"
 #endif
 
 #ifdef USE_BUTTON
